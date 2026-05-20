@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Midori — Premium Japanese-Style Finance Ledger</title>
+  
+  <!-- Progressive Web App Settings -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2d5a27">
+  
+  <!-- Apple Web App Standalone Mode Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Midori">
+  <link rel="apple-touch-icon" href="image/midori.png">
+
+  <!-- Beautiful Typography and Visual Customization -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Chart.js for High-Fidelity Interactive Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <div id="appContainer">
+    <!-- Sidebar Navigation -->
+    <aside>
+      <div>
+        <div class="brand">
+          <div class="brand-logo-container" style="background: none; box-shadow: none; padding: 0; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px;">
+            <img src="image/midori.png" alt="Midori Logo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">
+          </div>
+          <div>
+            <div class="brand-name">Midori</div>
+            <span style="font-size: 10px; font-weight:600; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">Leafy Accounting</span>
+          </div>
+        </div>
+
+        <nav>
+          <ul>
+            <li>
+              <a class="nav-link active" data-tab="dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-link" data-tab="wallets">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                <span>Wallets</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-link" data-tab="budgets">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                <span>Budgets</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-link" data-tab="tags">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                <span>Category Tags</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-link" data-tab="ledger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>Transactions</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-link" data-tab="schedules">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span>Schedules</span>
+              </a>
+            </li>
+            <li>
+              <a class="nav-link" data-tab="settings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span>Settings</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="theme-toggle-btn" id="themeToggleBtn">
+          <span id="themeToggleIcon" style="display: inline-flex; align-items: center; justify-content: center; margin-right: 6px;"></span>
+          <span id="themeToggleText">Dark Mode</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main>
+      <!-- Common Top Header -->
+      <header>
+        <div class="header-title-section">
+          <h1>Midori Ledger</h1>
+          <p>Elegant, multi-currency ledger with Japanese-inspired minimalist aesthetics.</p>
+        </div>
+        <div class="header-controls">
+          <!-- Time Travel Controller -->
+          <div class="time-travel-widget">
+            <span class="date-badge">
+              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <span id="virtualDateDisplay">2026-05-20</span>
+            </span>
+            <button class="time-travel-btn" id="timeTravelBtn1" onclick="triggerTimeTravel(1)">+1 Day</button>
+            <button class="time-travel-btn" id="timeTravelBtn7" onclick="triggerTimeTravel(7)">+1 Week</button>
+            <button class="time-travel-btn" id="timeTravelBtn30" onclick="triggerTimeTravel(30)">+1 Month</button>
+          </div>
+
+          <!-- Base Currency Selector -->
+          <div class="currency-selector-widget">
+            <label for="baseCurrencySelect">Base Currency</label>
+            <select id="baseCurrencySelect" class="currency-select" onchange="changeBaseCurrency(this.value)">
+              <option value="THB">THB (฿)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="CNY">CNY (¥)</option>
+              <option value="JPY">JPY (¥)</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <!-- ==========================================================================
+           TAB: DASHBOARD
+           ========================================================================== -->
+      <div id="tab-dashboard" class="tab-content active">
+        <!-- Metric Summary KPIs -->
+        <div class="dashboard-summary-grid">
+          <!-- Net Worth Card -->
+          <div class="metric-card net-worth">
+            <div class="metric-header">
+              <span>Total Assets</span>
+              <div class="metric-icon-circle">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="netWorthDisplay">¥0</div>
+            <div class="metric-desc">Converted net assets across all wallets</div>
+          </div>
+
+          <!-- Monthly Income Card -->
+          <div class="metric-card income">
+            <div class="metric-header">
+              <span>Income This Month</span>
+              <div class="metric-icon-circle">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="monthlyIncomeDisplay">¥0</div>
+            <div class="metric-desc" id="incomeGrowthText">Earnings generated in virtual month</div>
+          </div>
+
+          <!-- Monthly Expense Card -->
+          <div class="metric-card expense">
+            <div class="metric-header">
+              <span>Expense This Month</span>
+              <div class="metric-icon-circle">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="monthlyExpenseDisplay">¥0</div>
+            <div class="metric-desc" id="expenseGrowthText">Expenditures incurred in virtual month</div>
+          </div>
+
+          <!-- Savings Progress Card -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span>Monthly Savings Rate</span>
+              <div class="metric-icon-circle">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="savingsRateDisplay">0%</div>
+            <div class="metric-desc">Percentage of income saved</div>
+            <div class="metric-progress-container">
+              <div class="metric-progress-bar">
+                <div class="metric-progress-fill status-safe" id="savingsRateProgress" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Dashboard -->
+        <div class="dashboard-charts-section">
+          <!-- Main Line Trend Card -->
+          <div class="chart-card">
+            <h3>Cash Flow Trend <span style="font-size:11px; font-weight:500; opacity:0.6;">(Last 6 Months)</span></h3>
+            <div class="chart-container-large">
+              <canvas id="trendChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Expense Segment Donut -->
+          <div class="chart-card">
+            <h3>Expense Categories</h3>
+            <div class="chart-container-medium">
+              <canvas id="expenseDonut"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick actions / Recent Transactions row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <!-- Active budgets warnings -->
+          <div class="chart-card">
+            <h3 style="margin-bottom:12px;">Active Budget Alerts</h3>
+            <div id="dashboardBudgetAlerts" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Budgets will be generated dynamically -->
+            </div>
+          </div>
+          
+          <!-- Upcoming recurring items forecast -->
+          <div class="chart-card">
+            <h3>Upcoming Recurring Bills <span style="font-size:11px; font-weight:500; opacity:0.6;">(Next 30 Days)</span></h3>
+            <div id="dashboardForecastEvents" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Loaded dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           TAB: WALLETS
+           ========================================================================== -->
+      <div id="tab-wallets" class="tab-content">
+        <div class="section-header">
+          <h2>Wallets Management</h2>
+          <button class="add-btn" onclick="openModal('modalWallet')">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Add New Wallet
+          </button>
+        </div>
+        <div class="wallets-carousel" id="walletsContainer">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           TAB: BUDGETS
+           ========================================================================== -->
+      <div id="tab-budgets" class="tab-content">
+        <div class="section-header">
+          <h2>Monthly Budgets</h2>
+        </div>
+        
+        <div class="budgets-grid" id="budgetsContainer">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           TAB: CATEGORY TAGS
+           ========================================================================== -->
+      <div id="tab-tags" class="tab-content">
+        <div class="section-header">
+          <h2>Category Tags</h2>
+          <button class="add-btn" onclick="openModal('modalCategory')">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Create New Tag
+          </button>
+        </div>
+        
+        <div class="budgets-grid" id="tagsContainer">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           TAB: TRANSACTION LEDGER
+           ========================================================================== -->
+      <div id="tab-ledger" class="tab-content">
+        <div class="section-header">
+          <h2>Ledger History</h2>
+          <button class="add-btn" onclick="openModal('modalTransaction')">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Record Transaction
+          </button>
+        </div>
+
+        <!-- Filters Bar -->
+        <div class="ledger-filter-bar">
+          <div class="input-group">
+            <label for="filterSearch">Search Description</label>
+            <input type="text" id="filterSearch" class="form-control" placeholder="Search noodles, rent..." oninput="renderLedger()">
+          </div>
+          <div class="input-group">
+            <label for="filterWallet">Wallet</label>
+            <select id="filterWallet" class="form-control" onchange="renderLedger()">
+              <option value="all">All Wallets</option>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="filterTag">Category Tag</label>
+            <select id="filterTag" class="form-control" onchange="renderLedger()">
+              <option value="all">All Categories</option>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="filterType">Type</label>
+            <select id="filterType" class="form-control" onchange="renderLedger()">
+              <option value="all">Income & Expense</option>
+              <option value="income">Income Only</option>
+              <option value="expense">Expense Only</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Ledger Entries Table -->
+        <div class="ledger-table-container">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Transaction</th>
+                <th>Category Tag</th>
+                <th>Wallet</th>
+                <th>Amount</th>
+                <th style="width: 50px;"></th>
+              </tr>
+            </thead>
+            <tbody id="ledgerTableBody">
+              <!-- Entries populated dynamically -->
+            </tbody>
+          </table>
+          <div id="ledgerEmptyState" class="empty-placeholder" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+            <span>No transactions matching criteria are logged. Record a new transaction!</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           TAB: RECURRENCE SCHEDULES
+           ========================================================================== -->
+      <div id="tab-schedules" class="tab-content">
+        <div class="section-header">
+          <h2>Recurrence Schedules</h2>
+          <button class="add-btn" onclick="openModal('modalSchedule')">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Add Recurring Schedule
+          </button>
+        </div>
+
+        <div class="schedules-list" id="schedulesContainer">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           TAB: SETTINGS
+           ========================================================================== -->
+      <div id="tab-settings" class="tab-content">
+        <h2>App Configuration</h2>
+        
+        <div class="settings-group">
+          <h3>High Fidelity Mock Data</h3>
+          <p>Instantly pre-populate your ledger with 45 days of rich, multi-currency financial mock data, categories, and active schedules to preview charts and budget alerts immediately.</p>
+          <div class="settings-action-row">
+            <button class="add-btn" onclick="loadMatchaMockData()">
+              Generate Japanese Matcha Demo Data
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Data Portability</h3>
+          <p>Export your entire ledger configuration and transaction history to a localized JSON file or import a saved backup state.</p>
+          <div class="settings-action-row">
+            <button class="btn-secondary" onclick="triggerStateExport()">Export Backup JSON</button>
+            <button class="btn-secondary" onclick="document.getElementById('importFileInput').click()">Import Backup JSON</button>
+            <input type="file" id="importFileInput" style="display:none;" accept=".json" onchange="triggerStateImport(event)">
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Set to Default</h3>
+          <p>Restore the app to its original factory state with default wallets, category tags, and core preferences. This will replace your current settings and data.</p>
+          <div class="settings-action-row">
+            <button class="btn-secondary" onclick="triggerDefaultReset()">Set to Default State</button>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Erase Database</h3>
+          <p style="color:var(--autumn-terracotta);">Warning: This action will completely erase all wallets, transactions, tags, budgets, and histories saved in LocalStorage and reset the database to a completely empty clean slate.</p>
+          <div class="settings-action-row">
+            <button class="btn-danger" onclick="triggerStateReset()">Reset to Blank Slate</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: RECORD TRANSACTION
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalTransaction">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Record Transaction</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalTransaction')">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <form class="modal-form" id="transactionForm" onsubmit="submitTransactionForm(event)">
+        <!-- Row 1: Type & Amount -->
+        <div class="form-row">
+          <div class="input-group">
+            <label for="txType">Type</label>
+            <select id="txType" class="form-control" onchange="syncTransactionCategoryOptions()" required>
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="txAmount">Amount</label>
+            <input type="number" id="txAmount" class="form-control" placeholder="0.00" min="0.01" step="any" required>
+          </div>
+        </div>
+
+        <!-- Row 2: Title Description -->
+        <div class="input-group">
+          <label for="txTitle">Title Description</label>
+          <input type="text" id="txTitle" class="form-control" placeholder="Matcha Tea, Ramen Lunch..." required>
+        </div>
+
+        <!-- Row 3: Wallet & Custom Currency Select (Multi-currency purchase) -->
+        <div class="form-row">
+          <div class="input-group">
+            <label for="txWallet">Wallet</label>
+            <select id="txWallet" class="form-control" onchange="syncTransactionCurrencyDefault()" required>
+              <!-- Loaded dynamically -->
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="txCurrency">Tx Currency</label>
+            <select id="txCurrency" class="form-control" required>
+              <option value="JPY">JPY (¥)</option>
+              <option value="USD">USD ($)</option>
+              <option value="THB">THB (฿)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="CNY">CNY (¥)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Row 4: Category Tag & Transaction Date -->
+        <div class="form-row">
+          <div class="input-group">
+            <label for="txCategory">Category Tag</label>
+            <select id="txCategory" class="form-control" required>
+              <!-- Loaded dynamically -->
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="txDate">Transaction Date</label>
+            <input type="date" id="txDate" class="form-control" required>
+          </div>
+        </div>
+
+        <!-- Row 5: Short Note -->
+        <div class="input-group">
+          <label for="txNote">Short Note</label>
+          <input type="text" id="txNote" class="form-control" placeholder="Optional details...">
+        </div>
+
+        <button type="submit" class="form-submit-btn">Save Ledger Entry</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: ADD WALLET
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalWallet">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Create Wallet Card</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalWallet')">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <form class="modal-form" id="walletForm" onsubmit="submitWalletForm(event)">
+        <div class="input-group">
+          <label for="walletName">Wallet Card Name</label>
+          <input type="text" id="walletName" class="form-control" placeholder="E.g., Chase Bank, cash Pocket" required>
+        </div>
+
+        <div class="form-row">
+          <div class="input-group">
+            <label for="walletCurrency">Currency</label>
+            <select id="walletCurrency" class="form-control" required>
+              <option value="JPY">JPY (¥)</option>
+              <option value="USD">USD ($)</option>
+              <option value="THB">THB (฿)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="CNY">CNY (¥)</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="walletType">Card Type</label>
+            <select id="walletType" class="form-control" required>
+              <option value="Cash">Cash</option>
+              <option value="Debit Card">Debit Card</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="Savings">Savings Account</option>
+              <option value="Investment">Investment Ledger</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="walletBalance">Opening Balance</label>
+          <input type="number" id="walletBalance" class="form-control" placeholder="0.00" value="0" step="any" required>
+        </div>
+
+        <div class="input-group">
+          <label>Wallet Theme Card Design</label>
+          <div class="color-picker-grid" id="walletColorPicker">
+            <div class="color-option selected" style="background: #2d5a27;" data-color="#2d5a27"></div>
+            <div class="color-option" style="background: #5a7d5b;" data-color="#5a7d5b"></div>
+            <div class="color-option" style="background: #8ba88f;" data-color="#8ba88f"></div>
+            <div class="color-option" style="background: #a2a86c;" data-color="#a2a86c"></div>
+            <div class="color-option" style="background: #5e665c;" data-color="#5e665c"></div>
+            <div class="color-option" style="background: #cfa87b;" data-color="#cfa87b"></div>
+          </div>
+        </div>
+
+        <button type="submit" class="form-submit-btn">Create Wallet Card</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: EDIT WALLET
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalEditWallet">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Edit Wallet Card</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalEditWallet')">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <form class="modal-form" id="editWalletForm" onsubmit="submitEditWalletForm(event)">
+        <input type="hidden" id="editWalletId">
+        <div class="input-group">
+          <label for="editWalletName">Wallet Card Name</label>
+          <input type="text" id="editWalletName" class="form-control" placeholder="E.g., Chase Bank, cash Pocket" required>
+        </div>
+
+        <div class="form-row">
+          <div class="input-group">
+            <label for="editWalletCurrency">Currency</label>
+            <select id="editWalletCurrency" class="form-control" required>
+              <option value="JPY">JPY (¥)</option>
+              <option value="USD">USD ($)</option>
+              <option value="THB">THB (฿)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="CNY">CNY (¥)</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="editWalletType">Card Type</label>
+            <select id="editWalletType" class="form-control" required>
+              <option value="Cash">Cash</option>
+              <option value="Debit Card">Debit Card</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="Savings">Savings Account</option>
+              <option value="Investment">Investment Ledger</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="editWalletBalance">Opening Balance</label>
+          <input type="number" id="editWalletBalance" class="form-control" placeholder="0.00" step="any" required>
+        </div>
+
+        <div class="input-group">
+          <label>Wallet Theme Card Design</label>
+          <div class="color-picker-grid" id="editWalletColorPicker">
+            <div class="color-option" style="background: #2d5a27;" data-color="#2d5a27"></div>
+            <div class="color-option" style="background: #5a7d5b;" data-color="#5a7d5b"></div>
+            <div class="color-option" style="background: #8ba88f;" data-color="#8ba88f"></div>
+            <div class="color-option" style="background: #a2a86c;" data-color="#a2a86c"></div>
+            <div class="color-option" style="background: #5e665c;" data-color="#5e665c"></div>
+            <div class="color-option" style="background: #cfa87b;" data-color="#cfa87b"></div>
+          </div>
+        </div>
+
+        <button type="submit" class="form-submit-btn">Save Wallet Changes</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: CREATE TAG / BUDGET
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalCategory">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Create Tag & Monthly Budget</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalCategory')">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <form class="modal-form" id="categoryForm" onsubmit="submitCategoryForm(event)">
+        <div class="form-row">
+          <div class="input-group">
+            <label for="catType">Classification</label>
+            <select id="catType" class="form-control" onchange="syncCategoryFormBudgetState()" required>
+              <option value="expense">Expense Tag</option>
+              <option value="income">Income Tag</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="catIcon">Icon Motif</label>
+            <select id="catIcon" class="form-control" required>
+              <option value="leaf">🍃 Leaf</option>
+              <option value="utensils">🍽️ Food Utensils</option>
+              <option value="shoppingCart">🛒 Shopping Cart</option>
+              <option value="shoppingBag">🛍️ Shopping Bag</option>
+              <option value="home">🏠 Home Rent</option>
+              <option value="car">🚗 Car Commute</option>
+              <option value="film">🎬 Movie Leisure</option>
+              <option value="briefcase">💼 Briefcase Job</option>
+              <option value="trendUp">📈 Trend Upwards</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="catName">Tag Name</label>
+          <input type="text" id="catName" class="form-control" placeholder="E.g., Ramen Dinners, Subscriptions" required>
+        </div>
+
+        <div class="input-group" id="categoryBudgetGroup">
+          <label for="catBudget">Monthly Limit Budget Amount <span style="font-size:10px; font-weight:400; color:var(--text-muted);">(Optional - Set in Base Currency)</span></label>
+          <input type="number" id="catBudget" class="form-control" placeholder="Optional. e.g. 20000" min="0" step="any">
+        </div>
+
+        <div class="input-group">
+          <label>Tag Identity Color</label>
+          <div class="color-picker-grid" id="catColorPicker">
+            <div class="color-option selected" style="background: #5a7d5b;" data-color="#5a7d5b"></div>
+            <div class="color-option" style="background: #2d5a27;" data-color="#2d5a27"></div>
+            <div class="color-option" style="background: #8bb38f;" data-color="#8bb38f"></div>
+            <div class="color-option" style="background: #aabfa9;" data-color="#aabfa9"></div>
+            <div class="color-option" style="background: #a2a86c;" data-color="#a2a86c"></div>
+            <div class="color-option" style="background: #5e665c;" data-color="#5e665c"></div>
+          </div>
+        </div>
+
+        <button type="submit" class="form-submit-btn">Save New Tag</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: CREATE RECURRING SCHEDULE
+       ========================================================================== -->
+  <div class="modal-overlay" id="modalSchedule">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>Create Recurring Schedule</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalSchedule')">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <form class="modal-form" id="scheduleForm" onsubmit="submitScheduleForm(event)">
+        <div class="form-row">
+          <div class="input-group">
+            <label for="schedType">Type</label>
+            <select id="schedType" class="form-control" onchange="syncScheduleCategoryOptions()" required>
+              <option value="expense">Expense Bill</option>
+              <option value="income">Income Deposit</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="schedAmount">Recurring Amount</label>
+            <input type="number" id="schedAmount" class="form-control" placeholder="0.00" min="0.01" step="any" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="schedTitle">Schedule Title</label>
+          <input type="text" id="schedTitle" class="form-control" placeholder="Netflix Subscription, Salary Deposit..." required>
+        </div>
+
+        <div class="form-row">
+          <div class="input-group">
+            <label for="schedWallet">Billing Wallet</label>
+            <select id="schedWallet" class="form-control" required>
+              <!-- Loaded dynamically -->
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="schedCategory">Category Tag</label>
+            <select id="schedCategory" class="form-control" required>
+              <!-- Loaded dynamically -->
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="input-group">
+            <label for="schedFrequency">Frequency</label>
+            <select id="schedFrequency" class="form-control" required>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly" selected>Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="schedStartDate">First Occurrence Date</label>
+            <input type="date" id="schedStartDate" class="form-control" required>
+          </div>
+        </div>
+
+        <button type="submit" class="form-submit-btn">Initiate Recurring Schedule</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Core Javascript Engines -->
+  <script src="js/state.js"></script>
+  <script src="js/scheduler.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+  
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('Midori Service Worker registered successfully:', reg.scope))
+          .catch((err) => console.error('Midori Service Worker registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>

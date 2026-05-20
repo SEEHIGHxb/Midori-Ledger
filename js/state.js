@@ -1,0 +1,578 @@
+/**
+ * Midori — Premium Finance Ledger App
+ * state.js: State Management & Database Operations
+ */
+
+// Custom Icon SVG paths (leaf, wage/briefcase, chart, food, groceries, home, car, entertainment, shopping)
+const SVG_ICONS = {
+  leaf: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22C2 22 8 20 12 16C16 12 22 6 22 6C22 6 16 6 12 10C8 14 2 22 2 22Z"></path><path d="M12 2C12 2 13 8 10 11C7 14 2 15 2 15"></path></svg>`,
+  briefcase: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>`,
+  trendUp: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
+  utensils: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 1 6 8a6 6 0 0 1 12 0Z"></path><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="10" x2="12" y2="22"></line><line x1="9" y1="12" x2="15" y2="12"></line></svg>`,
+  shoppingCart: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>`,
+  home: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`,
+  car: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>`,
+  film: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>`,
+  shoppingBag: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>`
+};
+
+// Supported Currencies
+const CURRENCIES = {
+  USD: { symbol: '$', name: 'US Dollar', rate: 1.00 },
+  THB: { symbol: '฿', name: 'Thai Baht', rate: 36.50 },
+  EUR: { symbol: '€', name: 'Euro', rate: 0.92 },
+  CNY: { symbol: '¥', name: 'Chinese Yuan', rate: 7.24 },
+  JPY: { symbol: '¥', name: 'Japanese Yen', rate: 156.20 }
+};
+
+// State Object Definition
+let MidoriState = {
+  wallets: [],
+  categories: [],
+  transactions: [],
+  schedules: [],
+  preferences: {
+    theme: 'dark',
+    baseCurrency: 'THB'
+  },
+  virtualDate: '2026-05-20'
+};
+
+const LOCAL_STORAGE_KEY = 'midori_ledger_state';
+
+// Static Currency converter
+function convertAmount(amount, from, to) {
+  if (from === to) return amount;
+  const usdAmount = amount / CURRENCIES[from].rate;
+  return usdAmount * CURRENCIES[to].rate;
+}
+
+// Format amount nicely with symbols
+function formatCurrency(amount, currencyCode) {
+  const meta = CURRENCIES[currencyCode] || CURRENCIES.USD;
+  const decimals = (currencyCode === 'JPY') ? 0 : 2;
+  return meta.symbol + Number(amount).toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+}
+
+// Deep copy helpers
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+// Generate secure simple IDs
+function generateUUID() {
+  return 'midori_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Load state from local storage or set defaults
+function loadState() {
+  const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (data) {
+    try {
+      MidoriState = JSON.parse(data);
+      // Ensure all required fields exist
+      if (!MidoriState.wallets) MidoriState.wallets = [];
+      if (!MidoriState.categories) MidoriState.categories = [];
+      if (!MidoriState.transactions) MidoriState.transactions = [];
+      if (!MidoriState.schedules) MidoriState.schedules = [];
+      if (!MidoriState.preferences) MidoriState.preferences = { theme: 'dark', baseCurrency: 'THB' };
+      if (!MidoriState.virtualDate) MidoriState.virtualDate = '2026-05-20';
+    } catch (e) {
+      console.error('Failed to parse Midori state, resetting to default.', e);
+      resetToDefaultState();
+    }
+  } else {
+    resetToDefaultState();
+  }
+}
+
+// Save state to local storage
+function saveState() {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+  // Dispatch custom event to trigger UI updates
+  window.dispatchEvent(new CustomEvent('midoriStateChanged'));
+}
+
+// Reset state to default settings
+function resetToDefaultState() {
+  MidoriState = {
+    wallets: [],
+    categories: [],
+    transactions: [],
+    schedules: [],
+    preferences: {
+      theme: 'dark',
+      baseCurrency: 'THB'
+    },
+    virtualDate: '2026-05-20'
+  };
+  
+  // Set default categories
+  MidoriState.categories = [
+    { id: 'cat_salary', name: 'Salary', type: 'income', color: '#2d5a27', icon: 'leaf', budget: null },
+    { id: 'cat_freelance', name: 'Freelance', type: 'income', color: '#8ba88f', icon: 'briefcase', budget: null },
+    { id: 'cat_investment', name: 'Investments', type: 'income', color: '#a2a86c', icon: 'trendUp', budget: null },
+    
+    { id: 'cat_food', name: 'Food', type: 'expense', color: '#5a7d5b', icon: 'utensils', budget: 50000 },
+    { id: 'cat_groceries', name: 'Groceries', type: 'expense', color: '#8bb38f', icon: 'shoppingCart', budget: 20000 },
+    { id: 'cat_rent', name: 'Rent', type: 'expense', color: '#5e665c', icon: 'home', budget: 120000 },
+    { id: 'cat_transport', name: 'Transport', type: 'expense', color: '#40563f', icon: 'car', budget: 15000 },
+    { id: 'cat_entertainment', name: 'Entertainment', type: 'expense', color: '#cfa87b', icon: 'film', budget: 30000 },
+    { id: 'cat_shopping', name: 'Shopping', type: 'expense', color: '#aabfa9', icon: 'shoppingBag', budget: 40000 }
+  ];
+
+  // Set default Wallets
+  MidoriState.wallets = [
+    { id: 'w_cash', name: 'Pocket Cash', balance: 15000, currency: 'JPY', type: 'Cash', color: '#5a7d5b', openingBalance: 10000 },
+    { id: 'w_bank', name: 'Sumitomo Mitsui Bank', balance: 350000, currency: 'JPY', type: 'Debit Card', color: '#2d5a27', openingBalance: 280000 },
+    { id: 'w_thai', name: 'SCB Bank', balance: 45000, currency: 'THB', type: 'Savings', color: '#8ba88f', openingBalance: 30000 }
+  ];
+
+  saveState();
+}
+
+// Clear Database completely to an absolute blank slate
+function clearDatabase() {
+  MidoriState = {
+    wallets: [],
+    categories: [],
+    transactions: [],
+    schedules: [],
+    preferences: {
+      theme: 'dark',
+      baseCurrency: 'THB'
+    },
+    virtualDate: '2026-05-20'
+  };
+  saveState();
+}
+
+// Generate beautiful green dummy data with high visual fidelity
+function generateMatchaDummyData() {
+  resetToDefaultState();
+  
+  const currentDate = new Date(MidoriState.virtualDate);
+  const transactions = [];
+  
+  // Set up transactions going back 40 days
+  const baseDate = new Date(currentDate);
+  baseDate.setDate(baseDate.getDate() - 40);
+  
+  const tags = {
+    salary: 'cat_salary',
+    freelance: 'cat_freelance',
+    investment: 'cat_investment',
+    food: 'cat_food',
+    groceries: 'cat_groceries',
+    rent: 'cat_rent',
+    transport: 'cat_transport',
+    entertainment: 'cat_entertainment',
+    shopping: 'cat_shopping'
+  };
+
+  // 1. Regular Monthly Income
+  const lastMonthSalaryDate = new Date(baseDate);
+  lastMonthSalaryDate.setDate(25);
+  transactions.push({
+    id: generateUUID(),
+    title: 'Monthly Salary',
+    amount: 320000,
+    type: 'income',
+    walletId: 'w_bank',
+    categoryId: tags.salary,
+    date: lastMonthSalaryDate.toISOString().split('T')[0],
+    note: 'Sumitomo bank monthly salary deposit',
+    scheduledId: null
+  });
+
+  const lastMonthFreelance = new Date(baseDate);
+  lastMonthFreelance.setDate(28);
+  transactions.push({
+    id: generateUUID(),
+    title: 'Web Dev Freelance',
+    amount: 85000,
+    type: 'income',
+    walletId: 'w_bank',
+    categoryId: tags.freelance,
+    date: lastMonthFreelance.toISOString().split('T')[0],
+    note: 'Responsive landing page design',
+    scheduledId: null
+  });
+
+  // 2. Regular Rent payment
+  const lastMonthRent = new Date(baseDate);
+  lastMonthRent.setDate(27);
+  transactions.push({
+    id: generateUUID(),
+    title: 'Appartment Rent',
+    amount: 110000,
+    type: 'expense',
+    walletId: 'w_bank',
+    categoryId: tags.rent,
+    date: lastMonthRent.toISOString().split('T')[0],
+    note: 'Automatic rent transfer',
+    scheduledId: null
+  });
+
+  // 3. SCB Bank Deposits
+  const scbSalary = new Date(baseDate);
+  scbSalary.setDate(30);
+  transactions.push({
+    id: generateUUID(),
+    title: 'Freelance Design Project',
+    amount: 12000,
+    type: 'income',
+    walletId: 'w_thai',
+    categoryId: tags.freelance,
+    date: scbSalary.toISOString().split('T')[0],
+    note: 'Logo design for international client',
+    scheduledId: null
+  });
+
+  // 4. Spread out dining, shopping, groceries, transport transactions
+  const foodDescriptions = [
+    { title: 'Ichiran Ramen', amount: 1250, wallet: 'w_cash' },
+    { title: '7-Eleven Snacks', amount: 780, wallet: 'w_cash' },
+    { title: 'Starbucks Matcha Latte', amount: 650, wallet: 'w_bank' },
+    { title: 'Sushiro Lunch', amount: 2400, wallet: 'w_bank' },
+    { title: 'Yakitori Dinner', amount: 4800, wallet: 'w_cash' },
+    { title: 'FamilyMart Coffee', amount: 220, wallet: 'w_cash' }
+  ];
+
+  const groceryDescriptions = [
+    { title: 'Aeon Supermarket', amount: 5600, wallet: 'w_bank' },
+    { title: 'Life Grocery Store', amount: 3200, wallet: 'w_cash' },
+    { title: 'Don Quijote', amount: 8900, wallet: 'w_bank' }
+  ];
+
+  const transportDescriptions = [
+    { title: 'Suica Recharge', amount: 2000, wallet: 'w_cash' },
+    { title: 'Taxi Ride', amount: 1800, wallet: 'w_bank' },
+    { title: 'Subway Ticket', amount: 340, wallet: 'w_cash' }
+  ];
+
+  const shoppingDescriptions = [
+    { title: 'UNIQLO Linen Shirt', amount: 3990, wallet: 'w_bank' },
+    { title: 'MUJI Storage Boxes', amount: 2200, wallet: 'w_cash' },
+    { title: 'BookOff Manga Purchase', amount: 1500, wallet: 'w_cash' }
+  ];
+
+  const entertainmentDescriptions = [
+    { title: 'Toho Cinema Ticket', amount: 1900, wallet: 'w_bank' },
+    { title: 'Nintendo eShop Game', amount: 6800, wallet: 'w_bank' },
+    { title: 'Exhibition Entry Fee', amount: 1200, wallet: 'w_cash' }
+  ];
+
+  // Distribute dining/shopping transactions randomly over the past 40 days
+  let tempDate = new Date(baseDate);
+  let trIndex = 0;
+  while (tempDate <= currentDate) {
+    const day = tempDate.getDate();
+    // Every 2 days, let's add a food expense
+    if (day % 2 === 0) {
+      const desc = foodDescriptions[trIndex % foodDescriptions.length];
+      transactions.push({
+        id: generateUUID(),
+        title: desc.title,
+        amount: desc.amount + (day * 10),
+        type: 'expense',
+        walletId: desc.wallet,
+        categoryId: tags.food,
+        date: tempDate.toISOString().split('T')[0],
+        note: 'Outing expense',
+        scheduledId: null
+      });
+    }
+
+    // Every 5 days, groceries
+    if (day % 5 === 0) {
+      const desc = groceryDescriptions[trIndex % groceryDescriptions.length];
+      transactions.push({
+        id: generateUUID(),
+        title: desc.title,
+        amount: desc.amount,
+        type: 'expense',
+        walletId: desc.wallet,
+        categoryId: tags.groceries,
+        date: tempDate.toISOString().split('T')[0],
+        note: 'Weekly essentials',
+        scheduledId: null
+      });
+    }
+
+    // Every 6 days, transport
+    if (day % 6 === 0) {
+      const desc = transportDescriptions[trIndex % transportDescriptions.length];
+      transactions.push({
+        id: generateUUID(),
+        title: desc.title,
+        amount: desc.amount,
+        type: 'expense',
+        walletId: desc.wallet,
+        categoryId: tags.transport,
+        date: tempDate.toISOString().split('T')[0],
+        note: 'Commute',
+        scheduledId: null
+      });
+    }
+
+    // Every 8 days, shopping
+    if (day % 8 === 0) {
+      const desc = shoppingDescriptions[trIndex % shoppingDescriptions.length];
+      transactions.push({
+        id: generateUUID(),
+        title: desc.title,
+        amount: desc.amount,
+        type: 'expense',
+        walletId: desc.wallet,
+        categoryId: tags.shopping,
+        date: tempDate.toISOString().split('T')[0],
+        note: 'Apparel & tools',
+        scheduledId: null
+      });
+    }
+
+    // Every 12 days, entertainment
+    if (day % 12 === 0) {
+      const desc = entertainmentDescriptions[trIndex % entertainmentDescriptions.length];
+      transactions.push({
+        id: generateUUID(),
+        title: desc.title,
+        amount: desc.amount,
+        type: 'expense',
+        walletId: desc.wallet,
+        categoryId: tags.entertainment,
+        date: tempDate.toISOString().split('T')[0],
+        note: 'Leisure',
+        scheduledId: null
+      });
+    }
+
+    trIndex++;
+    tempDate.setDate(tempDate.getDate() + 1);
+  }
+
+  // Set schedules
+  const schedules = [
+    {
+      id: 'sch_netflix',
+      title: 'Netflix Standard Plan',
+      amount: 1490,
+      type: 'expense',
+      walletId: 'w_bank',
+      categoryId: tags.entertainment,
+      frequency: 'monthly',
+      startDate: '2026-05-01',
+      nextDueDate: '2026-06-01',
+      active: true
+    },
+    {
+      id: 'sch_spotify',
+      title: 'Spotify Premium Family',
+      amount: 1680,
+      type: 'expense',
+      walletId: 'w_bank',
+      categoryId: tags.entertainment,
+      frequency: 'monthly',
+      startDate: '2026-05-05',
+      nextDueDate: '2026-06-05',
+      active: true
+    },
+    {
+      id: 'sch_gym',
+      title: 'Gym Membership',
+      amount: 8800,
+      type: 'expense',
+      walletId: 'w_bank',
+      categoryId: tags.transport,
+      frequency: 'monthly',
+      startDate: '2026-05-10',
+      nextDueDate: '2026-06-10',
+      active: true
+    },
+    {
+      id: 'sch_savings_trans',
+      title: 'Auto Saving Transfer',
+      amount: 30000,
+      type: 'expense',
+      walletId: 'w_bank',
+      categoryId: tags.investment,
+      frequency: 'monthly',
+      startDate: '2026-05-25',
+      nextDueDate: '2026-05-25',
+      active: true
+    }
+  ];
+
+  MidoriState.transactions = transactions;
+  MidoriState.schedules = schedules;
+  
+  recalculateWalletBalances();
+}
+
+// Recalculate all wallet balances based on loaded transactions, converting currencies dynamically!
+function recalculateWalletBalances() {
+  MidoriState.wallets.forEach(wallet => {
+    wallet.balance = Number(wallet.openingBalance) || 0;
+  });
+
+  const sorted = [...MidoriState.transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  sorted.forEach(tx => {
+    const wallet = MidoriState.wallets.find(w => w.id === tx.walletId);
+    if (wallet) {
+      const txCurrency = tx.currency || wallet.currency;
+      const amountInWalletCurrency = convertAmount(tx.amount, txCurrency, wallet.currency);
+      if (tx.type === 'income') {
+        wallet.balance += amountInWalletCurrency;
+      } else {
+        wallet.balance -= amountInWalletCurrency;
+      }
+    }
+  });
+
+  saveState();
+}
+
+/**
+ * CRUD Methods
+ */
+
+// Wallets
+function addWallet(wallet) {
+  wallet.id = generateUUID();
+  wallet.balance = Number(wallet.balance) || 0;
+  MidoriState.wallets.push(wallet);
+  saveState();
+}
+
+function updateWallet(walletId, updatedFields) {
+  const index = MidoriState.wallets.findIndex(w => w.id === walletId);
+  if (index !== -1) {
+    MidoriState.wallets[index] = { ...MidoriState.wallets[index], ...updatedFields };
+    saveState();
+  }
+}
+
+function deleteWallet(walletId) {
+  MidoriState.wallets = MidoriState.wallets.filter(w => w.id !== walletId);
+  MidoriState.transactions = MidoriState.transactions.filter(t => t.walletId !== walletId);
+  saveState();
+}
+
+// Categories/Tags
+function addCategory(category) {
+  category.id = generateUUID();
+  category.budget = category.budget ? Number(category.budget) : null;
+  MidoriState.categories.push(category);
+  saveState();
+}
+
+function updateCategory(categoryId, updatedFields) {
+  const index = MidoriState.categories.findIndex(c => c.id === categoryId);
+  if (index !== -1) {
+    if (updatedFields.budget !== undefined) {
+      updatedFields.budget = updatedFields.budget ? Number(updatedFields.budget) : null;
+    }
+    MidoriState.categories[index] = { ...MidoriState.categories[index], ...updatedFields };
+    saveState();
+  }
+}
+
+function deleteCategory(categoryId) {
+  MidoriState.categories = MidoriState.categories.filter(c => c.id !== categoryId);
+  saveState();
+}
+
+// Transactions
+function addTransaction(tx) {
+  tx.id = generateUUID();
+  tx.amount = Number(tx.amount);
+  tx.date = tx.date || MidoriState.virtualDate;
+  MidoriState.transactions.push(tx);
+  
+  const wallet = MidoriState.wallets.find(w => w.id === tx.walletId);
+  if (wallet) {
+    const txCurrency = tx.currency || wallet.currency;
+    const amountInWalletCurrency = convertAmount(tx.amount, txCurrency, wallet.currency);
+    if (tx.type === 'income') {
+      wallet.balance += amountInWalletCurrency;
+    } else {
+      wallet.balance -= amountInWalletCurrency;
+    }
+  }
+  
+  saveState();
+}
+
+function deleteTransaction(txId) {
+  const txIndex = MidoriState.transactions.findIndex(t => t.id === txId);
+  if (txIndex !== -1) {
+    const tx = MidoriState.transactions[txIndex];
+    const wallet = MidoriState.wallets.find(w => w.id === tx.walletId);
+    if (wallet) {
+      const txCurrency = tx.currency || wallet.currency;
+      const amountInWalletCurrency = convertAmount(tx.amount, txCurrency, wallet.currency);
+      if (tx.type === 'income') {
+        wallet.balance -= amountInWalletCurrency;
+      } else {
+        wallet.balance += amountInWalletCurrency;
+      }
+    }
+    MidoriState.transactions.splice(txIndex, 1);
+    saveState();
+  }
+}
+
+// Schedules
+function addSchedule(schedule) {
+  schedule.id = generateUUID();
+  schedule.amount = Number(schedule.amount);
+  schedule.active = true;
+  MidoriState.schedules.push(schedule);
+  saveState();
+}
+
+function updateSchedule(schedId, updatedFields) {
+  const index = MidoriState.schedules.findIndex(s => s.id === schedId);
+  if (index !== -1) {
+    MidoriState.schedules[index] = { ...MidoriState.schedules[index], ...updatedFields };
+    saveState();
+  }
+}
+
+function deleteSchedule(schedId) {
+  MidoriState.schedules = MidoriState.schedules.filter(s => s.id !== schedId);
+  saveState();
+}
+
+// Preferences
+function updatePreference(key, value) {
+  MidoriState.preferences[key] = value;
+  saveState();
+}
+
+// Export Entire State
+function exportStateJSON() {
+  return JSON.stringify(MidoriState, null, 2);
+}
+
+// Import Entire State
+function importStateJSON(jsonString) {
+  try {
+    const parsed = JSON.parse(jsonString);
+    if (parsed.wallets && parsed.categories && parsed.transactions && parsed.schedules) {
+      MidoriState = parsed;
+      saveState();
+      return true;
+    }
+  } catch (e) {
+    console.error('Import failed', e);
+  }
+  return false;
+}
+
+loadState();

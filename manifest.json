@@ -1,0 +1,18 @@
+{
+  "name": "Midori Finance Ledger",
+  "short_name": "Midori",
+  "description": "Elegant, multi-currency ledger with Japanese-inspired minimalist aesthetics.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#2d5a27",
+  "theme_color": "#2d5a27",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "image/midori.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
