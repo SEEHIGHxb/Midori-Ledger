@@ -341,7 +341,6 @@ function renderDashboardBudgetAlerts(month, year, baseCurrency) {
     container.innerHTML = `<div class="metric-desc" style="padding:10px 0;">No active budget spending found for this virtual month.</div>`;
   }
 }
-}
 
 // Render Dashboard Forecast Widget
 function renderDashboardForecast() {
