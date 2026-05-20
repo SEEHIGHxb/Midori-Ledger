@@ -67,6 +67,30 @@ function generateUUID() {
   return 'midori_' + Math.random().toString(36).substr(2, 9);
 }
 
+// Clean up any orphaned future transactions (from deleted schedules)
+function cleanupOrphanedFutureTransactions() {
+  if (!MidoriState.schedules || !MidoriState.transactions) return;
+  const activeScheduleIds = new Set(MidoriState.schedules.map(s => s.id));
+  let changed = false;
+  
+  MidoriState.transactions = MidoriState.transactions.filter(tx => {
+    // If a transaction has a scheduledId that is not in the active schedules
+    // and its date is in the future relative to the virtualDate, prune it.
+    if (tx.scheduledId && !activeScheduleIds.has(tx.scheduledId)) {
+      if (tx.date > MidoriState.virtualDate) {
+        console.log(`Pruning orphaned future transaction: "${tx.title}" on ${tx.date}`);
+        changed = true;
+        return false;
+      }
+    }
+    return true;
+  });
+  
+  if (changed) {
+    saveState();
+  }
+}
+
 // Load state from local storage or set defaults
 function loadState() {
   const data = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -80,6 +104,9 @@ function loadState() {
       if (!MidoriState.schedules) MidoriState.schedules = [];
       if (!MidoriState.preferences) MidoriState.preferences = { theme: 'dark', baseCurrency: 'THB' };
       if (!MidoriState.virtualDate) MidoriState.virtualDate = '2026-05-20';
+      
+      // Clean up legacy orphaned future transactions
+      cleanupOrphanedFutureTransactions();
     } catch (e) {
       console.error('Failed to parse Midori state, resetting to default.', e);
       resetToDefaultState();
@@ -544,7 +571,8 @@ function updateSchedule(schedId, updatedFields) {
 
 function deleteSchedule(schedId) {
   MidoriState.schedules = MidoriState.schedules.filter(s => s.id !== schedId);
-  MidoriState.transactions = MidoriState.transactions.filter(t => t.scheduledId !== schedId);
+  // Delete only future occurrences of this schedule (relative to virtualDate) so past history is preserved!
+  MidoriState.transactions = MidoriState.transactions.filter(t => t.scheduledId !== schedId || t.date <= MidoriState.virtualDate);
   saveState();
   recalculateWalletBalances();
 }
@@ -567,6 +595,8 @@ function importStateJSON(jsonString) {
     if (parsed.wallets && parsed.categories && parsed.transactions && parsed.schedules) {
       MidoriState = parsed;
       saveState();
+      cleanupOrphanedFutureTransactions();
+      recalculateWalletBalances();
       return true;
     }
   } catch (e) {

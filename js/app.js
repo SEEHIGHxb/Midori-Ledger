@@ -1197,7 +1197,8 @@ function submitEditTransactionForm(e) {
     categoryId: document.getElementById('editTxCategory').value,
     currency: document.getElementById('editTxCurrency').value,
     date: document.getElementById('editTxDate').value,
-    note: document.getElementById('editTxNote').value
+    note: document.getElementById('editTxNote').value,
+    scheduledId: null
   };
 
   updateTransaction(id, updatedFields);
