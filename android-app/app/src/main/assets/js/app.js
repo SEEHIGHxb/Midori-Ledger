@@ -1423,7 +1423,7 @@ function toggleAutoDeviceDate(checked) {
 function enableZenSync() {
   if (confirm('Enable secure Cloud Sync? A private Sync Key will be generated for pairing.')) {
     const creds = generateSyncCredentials();
-    updatePreference('syncId', creds.syncId);
+    updatePreference('syncId', null);
     updatePreference('syncKey', creds.syncKey);
     updatePreference('syncEnabled', true);
     

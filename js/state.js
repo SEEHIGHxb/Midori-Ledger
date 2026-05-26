@@ -724,21 +724,17 @@ async function decryptData(encryptedPayload, syncKeyStr) {
 
 function generateSyncCredentials() {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let syncId = 'mds_';
   let syncKey = 'msk_';
-  for (let i = 0; i < 16; i++) {
-    syncId += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
   for (let i = 0; i < 24; i++) {
     syncKey += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return { syncId, syncKey };
+  return { syncKey };
 }
 
 let syncDebounceTimeout = null;
 
 function triggerAutoSyncPush() {
-  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncId || !MidoriState.preferences.syncKey) {
+  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncKey) {
     return;
   }
   
@@ -752,15 +748,14 @@ function triggerAutoSyncPush() {
 }
 
 async function pushStateToCloud() {
-  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncId || !MidoriState.preferences.syncKey) {
+  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncKey) {
     return false;
   }
   
   updateSyncStatusIndicator('syncing');
   
-  const bucketId = MidoriState.preferences.syncId;
+  const syncId = MidoriState.preferences.syncId;
   const syncKey = MidoriState.preferences.syncKey;
-  const url = `https://kvdb.io/buckets/${bucketId}/keys/state`;
   
   try {
     const plaintext = JSON.stringify(MidoriState);
@@ -770,16 +765,44 @@ async function pushStateToCloud() {
       updatedAt: MidoriState.updatedAt || Date.now()
     };
     
+    let url = 'https://jsonblob.com/api/jsonBlob';
+    let method = 'POST';
+    
+    if (syncId) {
+      url = `https://jsonblob.com/api/jsonBlob/${syncId}`;
+      method = 'PUT';
+    }
+    
     const response = await fetch(url, {
-      method: 'PUT',
+      method: method,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify(cloudEnvelope)
     });
     
     if (!response.ok) {
       throw new Error(`Upload failed: ${response.statusText}`);
+    }
+    
+    // Extract syncId from headers if it was a POST
+    if (!syncId) {
+      let newSyncId = response.headers.get('X-Jsonblob');
+      if (!newSyncId) {
+        const loc = response.headers.get('Location');
+        if (loc) {
+          const parts = loc.split('/');
+          newSyncId = parts[parts.length - 1];
+        }
+      }
+      
+      if (newSyncId) {
+        console.log(`Initial cloud sync created with Sync ID: ${newSyncId}`);
+        MidoriState.preferences.syncId = newSyncId;
+      } else {
+        throw new Error('Failed to extract Sync ID from cloud response headers');
+      }
     }
     
     MidoriState.preferences.lastSyncedAt = Date.now();
@@ -803,12 +826,12 @@ async function pullStateFromCloud() {
   
   const bucketId = MidoriState.preferences.syncId;
   const syncKey = MidoriState.preferences.syncKey;
-  const url = `https://kvdb.io/buckets/${bucketId}/keys/state`;
+  const url = `https://jsonblob.com/api/jsonBlob/${bucketId}`;
   
   try {
     const response = await fetch(url);
     if (response.status === 404) {
-      console.log('No state found on cloud. Initializing cloud with local state.');
+      console.log('State not found on cloud. Re-initializing cloud with local state.');
       await pushStateToCloud();
       updateSyncStatusIndicator('synced');
       return true;
