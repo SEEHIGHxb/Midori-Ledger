@@ -25,6 +25,15 @@ const CURRENCIES = {
   JPY: { symbol: '¥', name: 'Japanese Yen', rate: 156.20 }
 };
 
+// Helper for dynamic local device date
+function getDeviceTodayDateStr() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // State Object Definition
 let MidoriState = {
   wallets: [],
@@ -33,9 +42,15 @@ let MidoriState = {
   schedules: [],
   preferences: {
     theme: 'dark',
-    baseCurrency: 'THB'
+    baseCurrency: 'THB',
+    autoSyncDeviceDate: true,
+    syncEnabled: false,
+    syncId: null,
+    syncKey: null,
+    lastSyncedAt: 0
   },
-  virtualDate: '2026-05-20'
+  virtualDate: '2026-05-20',
+  updatedAt: 0
 };
 
 const LOCAL_STORAGE_KEY = 'midori_ledger_state';
@@ -102,8 +117,31 @@ function loadState() {
       if (!MidoriState.categories) MidoriState.categories = [];
       if (!MidoriState.transactions) MidoriState.transactions = [];
       if (!MidoriState.schedules) MidoriState.schedules = [];
-      if (!MidoriState.preferences) MidoriState.preferences = { theme: 'dark', baseCurrency: 'THB' };
-      if (!MidoriState.virtualDate) MidoriState.virtualDate = '2026-05-20';
+      
+      if (!MidoriState.preferences) {
+        MidoriState.preferences = {
+          theme: 'dark',
+          baseCurrency: 'THB',
+          autoSyncDeviceDate: true,
+          syncEnabled: false,
+          syncId: null,
+          syncKey: null,
+          lastSyncedAt: 0
+        };
+      } else {
+        if (MidoriState.preferences.autoSyncDeviceDate === undefined) MidoriState.preferences.autoSyncDeviceDate = true;
+        if (MidoriState.preferences.syncEnabled === undefined) MidoriState.preferences.syncEnabled = false;
+        if (MidoriState.preferences.syncId === undefined) MidoriState.preferences.syncId = null;
+        if (MidoriState.preferences.syncKey === undefined) MidoriState.preferences.syncKey = null;
+        if (MidoriState.preferences.lastSyncedAt === undefined) MidoriState.preferences.lastSyncedAt = 0;
+      }
+      
+      if (!MidoriState.virtualDate) {
+        MidoriState.virtualDate = MidoriState.preferences.autoSyncDeviceDate ? getDeviceTodayDateStr() : '2026-05-20';
+      }
+      if (!MidoriState.updatedAt) {
+        MidoriState.updatedAt = Date.now();
+      }
       
       // Clean up legacy orphaned future transactions
       cleanupOrphanedFutureTransactions();
@@ -118,13 +156,18 @@ function loadState() {
 
 // Save state to local storage
 function saveState() {
+  MidoriState.updatedAt = Date.now();
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
   // Dispatch custom event to trigger UI updates
   window.dispatchEvent(new CustomEvent('midoriStateChanged'));
+  
+  // Trigger background auto sync push if enabled
+  triggerAutoSyncPush();
 }
 
 // Reset state to default settings
 function resetToDefaultState() {
+  const today = getDeviceTodayDateStr();
   MidoriState = {
     wallets: [],
     categories: [],
@@ -132,9 +175,15 @@ function resetToDefaultState() {
     schedules: [],
     preferences: {
       theme: 'dark',
-      baseCurrency: 'THB'
+      baseCurrency: 'THB',
+      autoSyncDeviceDate: true,
+      syncEnabled: false,
+      syncId: null,
+      syncKey: null,
+      lastSyncedAt: 0
     },
-    virtualDate: '2026-05-20'
+    virtualDate: today,
+    updatedAt: Date.now()
   };
   
   // Set default categories
@@ -170,9 +219,15 @@ function clearDatabase() {
     schedules: [],
     preferences: {
       theme: 'dark',
-      baseCurrency: 'THB'
+      baseCurrency: 'THB',
+      autoSyncDeviceDate: true,
+      syncEnabled: false,
+      syncId: null,
+      syncKey: null,
+      lastSyncedAt: 0
     },
-    virtualDate: '2026-05-20'
+    virtualDate: getDeviceTodayDateStr(),
+    updatedAt: Date.now()
   };
   saveState();
 }
@@ -603,6 +658,208 @@ function importStateJSON(jsonString) {
     console.error('Import failed', e);
   }
   return false;
+}
+
+// Web Crypto AES-GCM Encrypted Cloud Sync (ZenSync) Engine
+async function deriveKey(syncKeyStr) {
+  const encoder = new TextEncoder();
+  const rawKey = encoder.encode(syncKeyStr);
+  const hash = await window.crypto.subtle.digest('SHA-256', rawKey);
+  return await window.crypto.subtle.importKey(
+    'raw',
+    hash,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptData(plaintextStr, syncKeyStr) {
+  const encoder = new TextEncoder();
+  const rawPlaintext = encoder.encode(plaintextStr);
+  const aesKey = await deriveKey(syncKeyStr);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  
+  const ciphertextBuffer = await window.crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv
+    },
+    aesKey,
+    rawPlaintext
+  );
+  
+  const ivBase64 = btoa(String.fromCharCode(...iv));
+  const ciphertextBytes = new Uint8Array(ciphertextBuffer);
+  const ciphertextBase64 = btoa(String.fromCharCode(...ciphertextBytes));
+  return `${ivBase64}:${ciphertextBase64}`;
+}
+
+async function decryptData(encryptedPayload, syncKeyStr) {
+  const parts = encryptedPayload.split(':');
+  if (parts.length !== 2) {
+    throw new Error('Invalid encrypted payload format.');
+  }
+  
+  const ivBase64 = parts[0];
+  const ciphertextBase64 = parts[1];
+  
+  const ivBytes = new Uint8Array(atob(ivBase64).split('').map(c => c.charCodeAt(0)));
+  const ciphertextBytes = new Uint8Array(atob(ciphertextBase64).split('').map(c => c.charCodeAt(0)));
+  
+  const aesKey = await deriveKey(syncKeyStr);
+  
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv: ivBytes
+    },
+    aesKey,
+    ciphertextBytes
+  );
+  
+  const decoder = new TextDecoder();
+  return decoder.decode(decryptedBuffer);
+}
+
+function generateSyncCredentials() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let syncId = 'mds_';
+  let syncKey = 'msk_';
+  for (let i = 0; i < 16; i++) {
+    syncId += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  for (let i = 0; i < 24; i++) {
+    syncKey += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return { syncId, syncKey };
+}
+
+let syncDebounceTimeout = null;
+
+function triggerAutoSyncPush() {
+  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncId || !MidoriState.preferences.syncKey) {
+    return;
+  }
+  
+  if (syncDebounceTimeout) {
+    clearTimeout(syncDebounceTimeout);
+  }
+  
+  syncDebounceTimeout = setTimeout(() => {
+    pushStateToCloud();
+  }, 2000);
+}
+
+async function pushStateToCloud() {
+  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncId || !MidoriState.preferences.syncKey) {
+    return false;
+  }
+  
+  updateSyncStatusIndicator('syncing');
+  
+  const bucketId = MidoriState.preferences.syncId;
+  const syncKey = MidoriState.preferences.syncKey;
+  const url = `https://kvdb.io/buckets/${bucketId}/keys/state`;
+  
+  try {
+    const plaintext = JSON.stringify(MidoriState);
+    const encrypted = await encryptData(plaintext, syncKey);
+    const cloudEnvelope = {
+      encryptedData: encrypted,
+      updatedAt: MidoriState.updatedAt || Date.now()
+    };
+    
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(cloudEnvelope)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+    
+    MidoriState.preferences.lastSyncedAt = Date.now();
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+    console.log('Successfully pushed state to cloud.');
+    updateSyncStatusIndicator('synced');
+    return true;
+  } catch (e) {
+    console.error('Failed to push state to cloud:', e);
+    updateSyncStatusIndicator('error');
+    return false;
+  }
+}
+
+async function pullStateFromCloud() {
+  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncId || !MidoriState.preferences.syncKey) {
+    return false;
+  }
+  
+  updateSyncStatusIndicator('syncing');
+  
+  const bucketId = MidoriState.preferences.syncId;
+  const syncKey = MidoriState.preferences.syncKey;
+  const url = `https://kvdb.io/buckets/${bucketId}/keys/state`;
+  
+  try {
+    const response = await fetch(url);
+    if (response.status === 404) {
+      console.log('No state found on cloud. Initializing cloud with local state.');
+      await pushStateToCloud();
+      updateSyncStatusIndicator('synced');
+      return true;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch state: ${response.statusText}`);
+    }
+    
+    const cloudEnvelope = await response.json();
+    if (!cloudEnvelope || !cloudEnvelope.encryptedData || !cloudEnvelope.updatedAt) {
+      throw new Error('Invalid cloud response envelope.');
+    }
+    
+    const decryptedJson = await decryptData(cloudEnvelope.encryptedData, syncKey);
+    const parsedState = JSON.parse(decryptedJson);
+    
+    const localUpdatedAt = MidoriState.updatedAt || 0;
+    const cloudUpdatedAt = cloudEnvelope.updatedAt;
+    
+    if (cloudUpdatedAt > localUpdatedAt) {
+      console.log(`Cloud state is newer (${cloudUpdatedAt} > ${localUpdatedAt}). Applying cloud state.`);
+      MidoriState = parsedState;
+      MidoriState.preferences.lastSyncedAt = Date.now();
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+      
+      cleanupOrphanedFutureTransactions();
+      recalculateWalletBalances();
+      
+      window.dispatchEvent(new CustomEvent('midoriStateChanged'));
+      updateSyncStatusIndicator('synced');
+      return true;
+    } else if (localUpdatedAt > cloudUpdatedAt) {
+      console.log(`Local state is newer (${localUpdatedAt} > ${cloudUpdatedAt}). Pushing local state to cloud.`);
+      await pushStateToCloud();
+    } else {
+      console.log('Local and cloud states are in perfect sync.');
+      updateSyncStatusIndicator('synced');
+    }
+    return true;
+  } catch (e) {
+    console.error('Failed to pull state from cloud:', e);
+    updateSyncStatusIndicator('error');
+    return false;
+  }
+}
+
+function updateSyncStatusIndicator(status) {
+  if (typeof window.updateSyncUI === 'function') {
+    window.updateSyncUI(status);
+  }
 }
 
 loadState();
