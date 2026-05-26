@@ -81,6 +81,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // 10. Background ZenSync Polling & Tab-Focus Auto-Sync
+  window.addEventListener('focus', () => {
+    if (MidoriState.preferences.syncEnabled && typeof pullStateFromCloud === 'function') {
+      console.log('ZenSync: Tab focused, pulling cloud updates...');
+      pullStateFromCloud();
+    }
+  });
+
+  setInterval(() => {
+    if (MidoriState.preferences.syncEnabled && typeof pullStateFromCloud === 'function') {
+      console.log('ZenSync: Background sync polling...');
+      pullStateFromCloud();
+    }
+  }, 60000); // Poll every 60 seconds
 });
 
 // Sync time inputs
