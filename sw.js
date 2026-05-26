@@ -3,7 +3,7 @@
  * sw.js: Service Worker for complete offline capabilities
  */
 
-const CACHE_NAME = 'midori-cache-v9';
+const CACHE_NAME = 'midori-cache-v10';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -13,6 +13,8 @@ const ASSETS_TO_CACHE = [
   './js/scheduler.js',
   './js/charts.js',
   './js/app.js',
+  './js/qrcode.min.js',
+  './js/jsqr.min.js',
   './image/midori.png'
 ];
 
