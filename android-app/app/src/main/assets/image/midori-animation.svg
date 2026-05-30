@@ -1,25 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
   <defs>
-    <!-- Background Radial Glow -->
-    <radialGradient id="bgGlow" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" stop-color="#0c231e" />
-      <stop offset="100%" stop-color="#101615" />
-    </radialGradient>
-
-    <!-- Stage Suspended Ground Gradients (Lead Designer Refinement) -->
+    <!-- Stage Suspended Ground Gradients (Theme Adaptive) -->
     <linearGradient id="platformGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#059669" stop-opacity="0" />
-      <stop offset="15%" stop-color="#059669" stop-opacity="0.3" />
-      <stop offset="50%" stop-color="#10B981" stop-opacity="0.8" />
-      <stop offset="85%" stop-color="#059669" stop-opacity="0.3" />
-      <stop offset="100%" stop-color="#059669" stop-opacity="0" />
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0" />
+      <stop offset="15%" stop-color="#10B981" stop-opacity="0.3" />
+      <stop offset="50%" stop-color="#34D399" stop-opacity="0.8" />
+      <stop offset="85%" stop-color="#10B981" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0" />
     </linearGradient>
     <linearGradient id="platformBase" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#1f2e2a" stop-opacity="0" />
-      <stop offset="20%" stop-color="#1f2e2a" stop-opacity="0.6" />
-      <stop offset="50%" stop-color="#1f2e2a" stop-opacity="1" />
-      <stop offset="80%" stop-color="#1f2e2a" stop-opacity="0.6" />
-      <stop offset="100%" stop-color="#1f2e2a" stop-opacity="0" />
+      <stop offset="0%" stop-color="#047857" stop-opacity="0" />
+      <stop offset="20%" stop-color="#047857" stop-opacity="0.4" />
+      <stop offset="50%" stop-color="#047857" stop-opacity="0.7" />
+      <stop offset="80%" stop-color="#047857" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#047857" stop-opacity="0" />
     </linearGradient>
 
     <!-- Financial Bar Gradients -->
@@ -75,8 +69,14 @@
       </feMerge>
     </filter>
     <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.5" />
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.35" />
     </filter>
+
+    <!-- Go-en Coin True Transparent Cutout Mask (Lead Designer Subtraction Technique) -->
+    <mask id="coinHole">
+      <rect x="-100" y="-100" width="200" height="200" fill="#ffffff" />
+      <rect x="-6.5" y="-6.5" width="13" height="13" rx="1.5" fill="#000000" />
+    </mask>
 
     <!-- Particle Glow -->
     <radialGradient id="sparkGlow" cx="50%" cy="50%" r="50%">
@@ -85,17 +85,11 @@
     </radialGradient>
   </defs>
 
-  <!-- Deep Velvet Charcoal Canvas -->
-  <rect width="100%" height="100%" fill="url(#bgGlow)" />
+  <!-- ==================== BACKGROUND ENVIRONMENTAL FRAMING ==================== -->
+  <!-- Zen Enso Ring Frame (Lead Designer Geometric Framing & Balance) -->
+  <path d="M 230 430 A 180 180 0 1 1 570 430" fill="none" stroke="#10B981" stroke-width="1.5" stroke-dasharray="4,6" opacity="0.22" />
 
-  <!-- Ambient Light Rays (Atmospheric Background with Komorebi Shimmer) -->
-  <g opacity="0.12" filter="url(#softGlow)">
-    <animate attributeName="opacity" values="0.08; 0.18; 0.08" dur="8s" repeatCount="indefinite" />
-    <path d="M-100 -100 L300 650 L200 650 Z" fill="#10B981" />
-    <path d="M400 -100 L750 650 L600 650 Z" fill="#34D399" />
-  </g>
-
-  <!-- Ground Minimalist Platform (Lead Designer Gradient Tapering) -->
+  <!-- Ground Minimalist Platform (Suspended void cap lines) -->
   <g filter="url(#dropShadow)">
     <line x1="150" y1="450" x2="650" y2="450" stroke="url(#platformBase)" stroke-width="6" stroke-linecap="round" />
     <line x1="180" y1="450" x2="620" y2="450" stroke="url(#platformGrad)" stroke-width="2" stroke-linecap="round" />
@@ -107,7 +101,7 @@
     <animateMotion path="M 120 -50 C 90 100, 220 220, 100 350 S 200 480, 80 650" dur="14s" repeatCount="indefinite" rotate="auto" />
     <g>
       <animateTransform attributeName="transform" type="rotate" values="0; 360" dur="7s" repeatCount="indefinite" />
-      <path d="M 0 0 C -10 -5 -15 5 -10 12 C -5 15 5 10 0 0 Z" fill="#047857" opacity="0.6" transform="scale(1.2)" />
+      <path d="M 0 0 C -10 -5 -15 5 -10 12 C -5 15 5 10 0 0 Z" fill="#047857" opacity="0.4" transform="scale(1.2)" />
     </g>
   </g>
 
@@ -116,7 +110,7 @@
     <animateMotion path="M 680 -50 C 720 120, 580 260, 680 390 S 550 500, 640 650" dur="12s" repeatCount="indefinite" rotate="auto" />
     <g>
       <animateTransform attributeName="transform" type="rotate" values="360; 0" dur="6s" repeatCount="indefinite" />
-      <path d="M 0 0 C 12 -5 18 5 12 12 C 5 15 -5 10 0 0 Z" fill="#10B981" opacity="0.4" transform="scale(0.9)" />
+      <path d="M 0 0 C 12 -5 18 5 12 12 C 5 15 -5 10 0 0 Z" fill="#10B981" opacity="0.3" transform="scale(0.9)" />
     </g>
   </g>
 
@@ -141,14 +135,39 @@
   </rect>
 
 
-  <!-- ==================== ORGANIC SPROUT (FLOWERING & ELASTIC IMPACT) ==================== -->
+  <!-- ==================== LEFT ORGANIC SPROUT (PROGRESSION COUNTERWEIGHT) ==================== -->
+  <!-- Anchored atop Bar 1 (277.5, 340) -->
+  <g transform="translate(277.5, 340)">
+    <g>
+      <!-- Germination scale scale-up starting at 1.0s -->
+      <animateTransform attributeName="transform" type="scale" from="0 0" to="1 1" dur="1.0s" begin="1.0s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.25" />
+      
+      <!-- Curved Tender Stem (Shorter, delicate) -->
+      <path d="M 0 0 C 2 -10 -1 -22 -2 -30" stroke="url(#stemGrad)" stroke-width="3" stroke-linecap="round" fill="none" />
+
+      <!-- Single Leaf (Growing & Swaying) -->
+      <g transform="translate(-1, -18)">
+        <g>
+          <animateTransform attributeName="transform" type="scale" from="0 0" to="1 1" dur="0.8s" begin="1.0s" fill="freeze" />
+          <g>
+            <!-- Slow, gentle leaf sway loop -->
+            <animateTransform attributeName="transform" type="rotate" values="-30; -10; -30" dur="5.5s" begin="1.8s" repeatCount="indefinite" calcMode="spline" keyTimes="0; 0.5; 1" keySplines="0.445, 0.05, 0.55, 0.95; 0.445, 0.05, 0.55, 0.95" />
+            <path d="M 0 0 C -8 -8 -18 -8 -20 2 C -17 10 -6 6 0 0 Z" fill="url(#leafGrad)" filter="url(#softGlow)" />
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+
+
+  <!-- ==================== RIGHT ORGANIC SPROUT (FLOWERING & ELASTIC IMPACT) ==================== -->
   <!-- Anchored relative to top center of Bar 3 (457.5, 210) -->
   <g transform="translate(457.5, 210)">
     <g>
       <!-- Germination Growth scale -->
       <animateTransform attributeName="transform" type="scale" from="0 0" to="1 1" dur="1.2s" begin="1.6s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.275" />
       
-      <!-- Reactive Squash & Wobble on Coin Impact (Lead Designer Refinement) -->
+      <!-- Reactive Squash & Wobble on Coin Impact -->
       <animateTransform attributeName="transform" type="scale"
         values="1 1; 1 0.75; 1 1.10; 1 0.92; 1 1.03; 1 1"
         keyTimes="0; 0.15; 0.35; 0.55; 0.75; 1"
@@ -171,7 +190,7 @@
         </g>
       </g>
 
-      <!-- Right Leaf (Staggered Growing & Asymmetric Swaying - Lead Designer Timing) -->
+      <!-- Right Leaf (Staggered Growing & Asymmetric Swaying) -->
       <g transform="translate(-3, -38)">
         <g>
           <!-- Staggered Right Leaf scale-in by 180ms (starts at 1.78s) -->
@@ -191,7 +210,7 @@
 
 
   <!-- ==================== 3D GOLDEN COIN (FALLING, BOUNCING, & WOBBLING) ==================== -->
-  <!-- Outer group manages gravity translate, bounce, and rotational Z-axis wobble -->
+  <!-- Outer group manages gravity translate, bounce, and Z-axis wobble -->
   <g>
     <!-- Drop & Elastic Sprout Impact translate path (Impact lands at ~3.29s) -->
     <animateTransform attributeName="transform" type="translate" 
@@ -201,7 +220,7 @@
       calcMode="spline"
       dur="1.8s" begin="2.3s" fill="freeze" />
 
-    <!-- Dynamic Z-Axis Momentum Wobble (Lead Designer Physics Refinement) -->
+    <!-- Dynamic Z-Axis Momentum Wobble -->
     <animateTransform attributeName="transform" type="rotate"
       values="0; -12; 18; -10; 6; -3; 0"
       keyTimes="0; 0.55; 0.72; 0.85; 0.93; 0.97; 1"
@@ -226,14 +245,14 @@
           keySplines="0.455, 0.03, 0.515, 0.955; 0.455, 0.03, 0.515, 0.955; 0.455, 0.03, 0.515, 0.955; 0.455, 0.03, 0.515, 0.955"
           calcMode="spline" />
 
-        <!-- Outer Gold Rim -->
-        <circle cx="0" cy="0" r="32" fill="url(#goldRim)" filter="url(#dropShadow)" />
+        <!-- Outer Gold Rim (With transparent cutout mask) -->
+        <circle cx="0" cy="0" r="32" fill="url(#goldRim)" filter="url(#dropShadow)" mask="url(#coinHole)" />
 
-        <!-- Inner Gold Plate -->
-        <circle cx="0" cy="0" r="25" fill="url(#goldFace)" stroke="#D97706" stroke-width="0.8" />
+        <!-- Inner Gold Plate (With transparent cutout mask) -->
+        <circle cx="0" cy="0" r="25" fill="url(#goldFace)" stroke="#D97706" stroke-width="0.8" mask="url(#coinHole)" />
 
-        <!-- Japanese Traditional Square Center Cutout -->
-        <rect x="-6.5" y="-6.5" width="13" height="13" rx="1.5" fill="#0d1b17" stroke="#92400E" stroke-width="0.8" />
+        <!-- Traditional Square Center Cutout Border (Only stroke, transparent fill) -->
+        <rect x="-6.5" y="-6.5" width="13" height="13" rx="1.5" fill="none" stroke="#92400E" stroke-width="0.8" />
 
         <!-- Subtle Premium Detailing (Asset Value Ribs) -->
         <g stroke="#FCD34D" stroke-width="1.2" opacity="0.6">
