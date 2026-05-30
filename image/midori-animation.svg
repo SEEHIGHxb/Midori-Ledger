@@ -1,0 +1,239 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
+  <defs>
+    <!-- Background Radial Glow -->
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#0c231e" />
+      <stop offset="100%" stop-color="#101615" />
+    </radialGradient>
+
+    <!-- Financial Bar Gradients -->
+    <linearGradient id="barGrad1" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#045a43" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+    <linearGradient id="barGrad2" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#047857" />
+      <stop offset="100%" stop-color="#34D399" />
+    </linearGradient>
+    <linearGradient id="barGrad3" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Japanese Go-en Coin Gradients -->
+    <linearGradient id="goldRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D" />
+      <stop offset="50%" stop-color="#D97706" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <linearGradient id="goldFace" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FBE588" />
+      <stop offset="30%" stop-color="#F59E0B" />
+      <stop offset="70%" stop-color="#D97706" />
+      <stop offset="100%" stop-color="#FCD34D" />
+    </linearGradient>
+
+    <!-- Organic Sprout Gradients -->
+    <linearGradient id="stemGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#047857" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+    <linearGradient id="leafGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#34D399" />
+    </linearGradient>
+
+    <!-- Glowing Filters -->
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="coinGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComponentTransfer in="blur" result="glow">
+        <feFuncA type="linear" slope="0.6" />
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="glow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+
+    <!-- Particle Glow -->
+    <radialGradient id="sparkGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FCD34D" stop-opacity="1" />
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Deep Velvet Charcoal Canvas -->
+  <rect width="100%" height="100%" fill="url(#bgGlow)" />
+
+  <!-- Ambient Light Rays (Atmospheric Background) -->
+  <g opacity="0.15" filter="url(#softGlow)">
+    <path d="M-100 -100 L300 650 L200 650 Z" fill="#10B981" />
+    <path d="M400 -100 L750 650 L600 650 Z" fill="#34D399" />
+  </g>
+
+  <!-- Ground Minimalist Platform -->
+  <g filter="url(#dropShadow)">
+    <line x1="150" y1="450" x2="650" y2="450" stroke="#1f2e2a" stroke-width="6" stroke-linecap="round" />
+    <line x1="180" y1="450" x2="620" y2="450" stroke="#059669" stroke-width="2" stroke-linecap="round" opacity="0.3" />
+  </g>
+
+  <!-- ==================== BACKGROUND FLOATING LEAVES ==================== -->
+  <!-- Fluttering Leaf 1 (Left) -->
+  <g>
+    <path d="M 0 0 C -10 -5 -15 5 -10 12 C -5 15 5 10 0 0 Z" fill="#047857" opacity="0.6" transform="scale(1.2)">
+      <animateMotion path="M 120 -50 C 90 100, 220 220, 100 350 S 200 480, 80 650" dur="14s" repeatCount="indefinite" rotate="auto" />
+      <animateTransform attributeName="transform" type="rotate" values="0; 360" dur="7s" repeatCount="indefinite" additive="sum" />
+    </path>
+  </g>
+
+  <!-- Fluttering Leaf 2 (Right) -->
+  <g>
+    <path d="M 0 0 C 12 -5 18 5 12 12 C 5 15 -5 10 0 0 Z" fill="#10B981" opacity="0.4" transform="scale(0.9)">
+      <animateMotion path="M 680 -50 C 720 120, 580 260, 680 390 S 550 500, 640 650" dur="12s" repeatCount="indefinite" rotate="auto" />
+      <animateTransform attributeName="transform" type="rotate" values="360; 0" dur="6s" repeatCount="indefinite" additive="sum" />
+    </path>
+  </g>
+
+
+  <!-- ==================== FINANCIAL BARS (GROWING) ==================== -->
+  <!-- Bar 1 (Left) -->
+  <rect x="250" y="450" width="55" height="0" rx="8" fill="url(#barGrad1)" filter="url(#dropShadow)">
+    <animate attributeName="height" from="0" to="110" dur="1s" begin="0.2s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.1" />
+    <animate attributeName="y" from="450" to="340" dur="1s" begin="0.2s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.1" />
+  </rect>
+
+  <!-- Bar 2 (Middle) -->
+  <rect x="340" y="450" width="55" height="0" rx="8" fill="url(#barGrad2)" filter="url(#dropShadow)">
+    <animate attributeName="height" from="0" to="170" dur="1.1s" begin="0.5s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.1" />
+    <animate attributeName="y" from="450" to="280" dur="1.1s" begin="0.5s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.1" />
+  </rect>
+
+  <!-- Bar 3 (Right - The Tallest Sprouting Bar) -->
+  <rect x="430" y="450" width="55" height="0" rx="8" fill="url(#barGrad3)" filter="url(#dropShadow)">
+    <animate attributeName="height" from="0" to="240" dur="1.2s" begin="0.8s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.15" />
+    <animate attributeName="y" from="450" to="210" dur="1.2s" begin="0.8s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.15" />
+  </rect>
+
+
+  <!-- ==================== ORGANIC SPROUT (MORPHEUS FLOWERING) ==================== -->
+  <!-- Sprout coordinates anchored relative to Top Center of Bar 3 (457.5, 210) -->
+  <g transform="translate(457.5, 210)">
+    <!-- Scale growth animation centered at anchor (0, 0) -->
+    <g>
+      <animateTransform attributeName="transform" type="scale" from="0 0" to="1 1" dur="1.2s" begin="1.6s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.175, 0.885, 0.32, 1.275" />
+
+      <!-- Curved Tender Stem -->
+      <path d="M 0 0 C 4 -15 -2 -35 -4 -48" stroke="url(#stemGrad)" stroke-width="4.5" stroke-linecap="round" fill="none" />
+
+      <!-- Left Leaf (Growing & Tilting) -->
+      <g transform="translate(-2, -28)">
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="-40; -15; -40" dur="6s" begin="2.8s" repeatCount="indefinite" calcMode="spline" keyTimes="0; 0.5; 1" keySplines="0.445, 0.05, 0.55, 0.95; 0.445, 0.05, 0.55, 0.95" />
+          <path d="M 0 0 C -12 -12 -26 -12 -28 2 C -24 14 -8 8 0 0 Z" fill="url(#leafGrad)" filter="url(#softGlow)" />
+        </g>
+      </g>
+
+      <!-- Right Leaf (Growing & Tilting) -->
+      <g transform="translate(-3, -38)">
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="40; 20; 40" dur="6s" begin="2.8s" repeatCount="indefinite" calcMode="spline" keyTimes="0; 0.5; 1" keySplines="0.445, 0.05, 0.55, 0.95; 0.445, 0.05, 0.55, 0.95" />
+          <path d="M 0 0 C 14 -12 28 -8 26 6 C 20 16 6 8 0 0 Z" fill="url(#leafGrad)" filter="url(#softGlow)" />
+        </g>
+      </g>
+
+      <!-- Tiny Central Growing Bud -->
+      <path d="M -4 -48 C -7 -52 -4 -58 -4 -58 C -4 -58 -1 -52 -4 -48 Z" fill="#34D399" />
+    </g>
+  </g>
+
+
+  <!-- ==================== 3D GOLDEN COIN (FALLING & BOUNCING) ==================== -->
+  <!-- Outer group manages gravity fall, elastic bounce on sprout, and subsequent loop float -->
+  <g>
+    <!-- Drop & Elastic Sprout Impact (Impact lands at ~3.2s) -->
+    <animateTransform attributeName="transform" type="translate" 
+      values="457.5 -100; 457.5 125; 457.5 90; 457.5 125; 457.5 115; 457.5 120" 
+      keyTimes="0; 0.55; 0.72; 0.85; 0.93; 1"
+      keySplines="0.47, 0, 0.745, 0.715; 0.33, 1, 0.68, 1; 0.47, 0, 0.745, 0.715; 0.33, 1, 0.68, 1; 0.47, 0, 0.745, 0.715"
+      calcMode="spline"
+      dur="1.8s" begin="2.3s" fill="freeze" />
+
+    <!-- Idle Gentle Float (Triggered after coin settles, begin = 4.1s) -->
+    <g>
+      <animateTransform attributeName="transform" type="translate" 
+        values="0 0; 0 -8; 0 0" 
+        dur="4.5s" begin="4.1s" repeatCount="indefinite" 
+        calcMode="spline" keyTimes="0; 0.5; 1" keySplines="0.445, 0.05, 0.55, 0.95; 0.445, 0.05, 0.55, 0.95" />
+
+      <!-- Inner group handles the 3D Y-Axis Spin (scaleX animation) -->
+      <g filter="url(#coinGlow)">
+        <!-- 3D spin cycle -->
+        <animateTransform attributeName="transform" type="scale" 
+          values="1 1; 0.02 1; -1 1; 0.02 1; 1 1" 
+          dur="3.2s" repeatCount="indefinite" 
+          keyTimes="0; 0.25; 0.5; 0.75; 1"
+          keySplines="0.455, 0.03, 0.515, 0.955; 0.455, 0.03, 0.515, 0.955; 0.455, 0.03, 0.515, 0.955; 0.455, 0.03, 0.515, 0.955"
+          calcMode="spline" />
+
+        <!-- Outer Gold Rim -->
+        <circle cx="0" cy="0" r="32" fill="url(#goldRim)" filter="url(#dropShadow)" />
+
+        <!-- Inner Gold Plate -->
+        <circle cx="0" cy="0" r="25" fill="url(#goldFace)" stroke="#D97706" stroke-width="0.8" />
+
+        <!-- Japanese Traditional Square Center Cutout -->
+        <rect x="-6.5" y="-6.5" width="13" height="13" rx="1.5" fill="#0d1b17" stroke="#92400E" stroke-width="0.8" />
+
+        <!-- Subtle Premium Detailing (Asset Value Ribs) -->
+        <g stroke="#FCD34D" stroke-width="1.2" opacity="0.6">
+          <line x1="0" y1="-18" x2="0" y2="-22" />
+          <line x1="0" y1="18" x2="0" y2="22" />
+          <line x1="-18" y1="0" x2="-22" y2="0" />
+          <line x1="18" y1="0" x2="22" y2="0" />
+        </g>
+      </g>
+    </g>
+  </g>
+
+
+  <!-- ==================== WEALTH SPARK PARTICLES ==================== -->
+  <!-- Sparks trigger exactly upon the coin's first impact on the sprout at 3.3s -->
+  <g transform="translate(457.5, 125)">
+    <!-- Spark 1 (Top-Left Arc) -->
+    <circle cx="0" cy="0" r="4" fill="url(#sparkGlow)" opacity="0">
+      <animate attributeName="opacity" values="0; 1; 0.8; 0" dur="1.2s" begin="3.3s" fill="freeze" />
+      <animateTransform attributeName="transform" type="translate" values="0 0; -45 -55" dur="1.2s" begin="3.3s" fill="freeze" calcMode="spline" keyTimes="0; 1" keySplines="0.1, 0.8, 0.3, 1" />
+    </circle>
+
+    <!-- Spark 2 (Top-Right Arc) -->
+    <circle cx="0" cy="0" r="5" fill="url(#sparkGlow)" opacity="0">
+      <animate attributeName="opacity" values="0; 1; 0.8; 0" dur="1.4s" begin="3.3s" fill="freeze" />
+      <animateTransform attributeName="transform" type="translate" values="0 0; 50 -45" dur="1.4s" begin="3.3s" fill="freeze" calcMode="spline" keyTimes="0; 1" keySplines="0.1, 0.8, 0.3, 1" />
+    </circle>
+
+    <!-- Spark 3 (Far Left Drift) -->
+    <circle cx="0" cy="0" r="3.5" fill="#34D399" opacity="0" filter="url(#softGlow)">
+      <animate attributeName="opacity" values="0; 0.9; 0.6; 0" dur="1s" begin="3.35s" fill="freeze" />
+      <animateTransform attributeName="transform" type="translate" values="0 0; -65 -15" dur="1s" begin="3.35s" fill="freeze" calcMode="spline" keyTimes="0; 1" keySplines="0.1, 0.8, 0.3, 1" />
+    </circle>
+
+    <!-- Spark 4 (Far Right Drift) -->
+    <circle cx="0" cy="0" r="4.5" fill="#10B981" opacity="0" filter="url(#softGlow)">
+      <animate attributeName="opacity" values="0; 0.9; 0.6; 0" dur="1.1s" begin="3.3s" fill="freeze" />
+      <animateTransform attributeName="transform" type="translate" values="0 0; 70 5" dur="1.1s" begin="3.3s" fill="freeze" calcMode="spline" keyTimes="0; 1" keySplines="0.1, 0.8, 0.3, 1" />
+    </circle>
+
+    <!-- Spark 5 (Vertical Burst) -->
+    <circle cx="0" cy="0" r="3.5" fill="url(#sparkGlow)" opacity="0">
+      <animate attributeName="opacity" values="0; 1; 0" dur="1.5s" begin="3.32s" fill="freeze" />
+      <animateTransform attributeName="transform" type="translate" values="0 0; -5 -80" dur="1.5s" begin="3.32s" fill="freeze" calcMode="spline" keyTimes="0; 1" keySplines="0.15, 0.85, 0.35, 1" />
+    </circle>
+  </g>
+</svg>

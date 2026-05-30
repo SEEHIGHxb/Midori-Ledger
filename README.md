@@ -1,6 +1,10 @@
-# Midori — Premium Personal Finance Ledger 🍃
+# Midori — Leafy Ledger 🍃
 
-Midori (緑) is a premium, feature-rich Japanese-style personal finance ledger. It is designed to run entirely in the browser as a client-side Single Page Application (SPA), utilizing standard HTML5, CSS3, and JavaScript, with local data persistence via browser `localStorage`. 
+<p align="center">
+  <img src="image/midori-animation.svg" alt="Midori - Leafy Ledger Animation" width="480"/>
+</p>
+
+Midori (緑) is a premium, feature-rich personal finance ledger themed around modern, secure, and offline-first "Leafy Ledger" design principles. It runs entirely in the browser as a client-side Single Page Application (SPA), utilizing standard HTML5, CSS3, and JavaScript, with local data persistence via browser `localStorage`. 
 
 Midori fully supports:
 - **Multi-currency accounts**: USD, EUR, THB, CNY, and JPY with automatic real-time conversion maths.
