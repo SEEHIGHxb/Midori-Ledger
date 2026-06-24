@@ -75,3 +75,29 @@ Once your site is live on GitHub Pages (or hosted locally):
 2. Tap the **three-dot menu icon** in the top-right corner.
 3. Tap **Install app** (or **Add to Home screen**).
 4. Follow the prompt to install. The application will be added to your home screen and app drawer as a standalone native app shell.
+
+---
+
+## 🛠️ Development
+
+Midori ships as plain `<script>`-tag JavaScript with no build step or bundler — `index.html` must keep working when opened directly via `file://`, since the Android wrapper app loads it that way.
+
+### Running the test suite
+
+A small `node --test` suite covers the riskiest pure logic (currency conversion, input validators, orphaned-transaction cleanup, and recurring-schedule date advancement) by loading the real `js/state.js`/`js/scheduler.js` source files into a headless Node `vm` sandbox — no DOM, no new runtime dependency.
+
+```bash
+npm test
+```
+
+This only runs at dev time; it has no effect on the deployed static app.
+
+### ⚠️ Android wrapper asset sync — required before every native build
+
+The Android wrapper app (`android-app/`) bundles its own **copy** of the web assets under `android-app/app/src/main/assets`. That copy is **not** automatically kept in sync with the project root — if you edit `index.html`, anything in `js/`, `css/`, or `image/`, or `sw.js`/`manifest.json`, you must re-sync before building/installing the Android app, or it will run stale code:
+
+```bash
+npm run sync-android
+```
+
+(equivalent to running `sync_android_assets.ps1` directly in PowerShell). Treat this as a mandatory pre-build step, the same way you'd treat a `pip install`/`npm install` before running a project — there is currently no CI/Gradle hook that runs it for you automatically.

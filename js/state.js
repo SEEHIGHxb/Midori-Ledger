@@ -16,7 +16,8 @@ const SVG_ICONS = {
   shoppingBag: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>`
 };
 
-// Supported Currencies
+// Supported Currencies — rates below are the offline fallback table, used
+// when the live FX fetch fails or the device is offline. See refreshFxRates().
 const CURRENCIES = {
   USD: { symbol: '$', name: 'US Dollar', rate: 1.00 },
   THB: { symbol: '฿', name: 'Thai Baht', rate: 36.50 },
@@ -24,6 +25,53 @@ const CURRENCIES = {
   CNY: { symbol: '¥', name: 'Chinese Yuan', rate: 7.24 },
   JPY: { symbol: '¥', name: 'Japanese Yen', rate: 156.20 }
 };
+
+const FX_API_URL = 'https://open.er-api.com/v6/latest/USD';
+const FX_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // refresh at most once a day
+
+// Apply a {CODE: rate} map (relative to USD) onto the in-memory CURRENCIES table
+function applyFxRates(rates) {
+  Object.keys(CURRENCIES).forEach(code => {
+    if (code === 'USD') return; // USD is always the 1.00 base
+    if (rates && rates[code] !== undefined && Number.isFinite(rates[code])) {
+      CURRENCIES[code].rate = rates[code];
+    }
+  });
+}
+
+// Fetch live FX rates, falling back to the cached or hardcoded rates when
+// offline/unreachable. Safe to call on every app load — it self-throttles.
+async function refreshFxRates() {
+  const cache = MidoriState.fxRatesCache;
+  const now = Date.now();
+
+  if (cache && cache.rates && (now - cache.fetchedAt) < FX_REFRESH_INTERVAL_MS) {
+    applyFxRates(cache.rates);
+    return;
+  }
+
+  try {
+    const response = await fetch(FX_API_URL);
+    if (!response.ok) throw new Error(`FX fetch failed with status ${response.status}`);
+    const data = await response.json();
+    if (!data || !data.rates) throw new Error('FX response missing rates field');
+
+    const rates = {};
+    Object.keys(CURRENCIES).forEach(code => {
+      if (data.rates[code] !== undefined) rates[code] = data.rates[code];
+    });
+
+    applyFxRates(rates);
+    MidoriState.fxRatesCache = { rates, fetchedAt: now };
+    saveState();
+  } catch (e) {
+    console.warn('Could not refresh live FX rates; using cached/fallback rates instead.', e);
+    if (cache && cache.rates) {
+      applyFxRates(cache.rates);
+    }
+    // else: hardcoded fallback rates in CURRENCIES remain in effect untouched
+  }
+}
 
 // Helper for dynamic local device date
 function getDeviceTodayDateStr() {
@@ -50,7 +98,8 @@ let MidoriState = {
     lastSyncedAt: 0
   },
   virtualDate: '2026-05-20',
-  updatedAt: 0
+  updatedAt: 0,
+  fxRatesCache: null
 };
 
 const LOCAL_STORAGE_KEY = 'midori_ledger_state';
@@ -80,6 +129,16 @@ function deepClone(obj) {
 // Generate secure simple IDs
 function generateUUID() {
   return 'midori_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Form input validators (shared by all add/edit form handlers in app.js)
+function validateAmount(value) {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0;
+}
+
+function validateRequiredText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 // Clean up any orphaned future transactions (from deleted schedules)
@@ -153,7 +212,10 @@ function loadState() {
       if (!MidoriState.updatedAt) {
         MidoriState.updatedAt = Date.now();
       }
-      
+      if (MidoriState.fxRatesCache === undefined) {
+        MidoriState.fxRatesCache = null;
+      }
+
       // Clean up legacy orphaned future transactions
       cleanupOrphanedFutureTransactions();
     } catch (e) {
@@ -168,10 +230,18 @@ function loadState() {
 // Save state to local storage
 function saveState() {
   MidoriState.updatedAt = Date.now();
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+  } catch (e) {
+    console.error('Failed to persist Midori state to localStorage.', e);
+    window.dispatchEvent(new CustomEvent('midoriStorageQuotaExceeded'));
+    // Still notify UI to reflect in-memory state, but skip cloud sync of unsaved data
+    window.dispatchEvent(new CustomEvent('midoriStateChanged'));
+    return;
+  }
   // Dispatch custom event to trigger UI updates
   window.dispatchEvent(new CustomEvent('midoriStateChanged'));
-  
+
   // Trigger background auto sync push if enabled
   triggerAutoSyncPush();
 }
@@ -665,17 +735,39 @@ function exportStateJSON() {
   return JSON.stringify(MidoriState, null, 2);
 }
 
+// Validate the shape of a parsed backup before accepting it, so a malformed
+// or hand-edited JSON file can't silently corrupt MidoriState.
+function isValidStateShape(parsed) {
+  if (!parsed || typeof parsed !== 'object') return false;
+
+  const arrayFields = ['wallets', 'categories', 'transactions', 'schedules'];
+  for (const field of arrayFields) {
+    if (!Array.isArray(parsed[field])) return false;
+  }
+
+  const hasRequiredFields = (item, fields) =>
+    item && typeof item === 'object' && fields.every(f => item[f] !== undefined && item[f] !== null);
+
+  const walletsValid = parsed.wallets.every(w => hasRequiredFields(w, ['id', 'name', 'currency']));
+  const categoriesValid = parsed.categories.every(c => hasRequiredFields(c, ['id', 'name', 'type']));
+  const transactionsValid = parsed.transactions.every(t => hasRequiredFields(t, ['id', 'title', 'amount', 'type', 'walletId', 'date']));
+  const schedulesValid = parsed.schedules.every(s => hasRequiredFields(s, ['id', 'title', 'amount', 'type', 'walletId', 'frequency', 'startDate']));
+
+  return walletsValid && categoriesValid && transactionsValid && schedulesValid;
+}
+
 // Import Entire State
 function importStateJSON(jsonString) {
   try {
     const parsed = JSON.parse(jsonString);
-    if (parsed.wallets && parsed.categories && parsed.transactions && parsed.schedules) {
+    if (isValidStateShape(parsed)) {
       MidoriState = parsed;
       saveState();
       cleanupOrphanedFutureTransactions();
       recalculateWalletBalances();
       return true;
     }
+    console.error('Import failed: backup file does not match the expected state shape.');
   } catch (e) {
     console.error('Import failed', e);
   }

@@ -1,0 +1,10 @@
+{
+  "name": "midori-leafy-ledger",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dev-time test runner for Midori. The deployed app itself remains a build-step-free static site (plain <script> tags).",
+  "scripts": {
+    "test": "node --test tests/",
+    "sync-android": "powershell -ExecutionPolicy Bypass -File sync_android_assets.ps1"
+  }
+}
