@@ -8,11 +8,6 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-// Date strings like '2026-01-31' parse as UTC midnight, but getNextOccurrenceDate
-// advances them with local-time Date methods (setDate/setMonth/etc.) — pin the
-// test process to UTC so date-math assertions are deterministic on any machine.
-process.env.TZ = 'UTC';
-
 function createSandbox() {
   const store = new Map();
   const listeners = {};

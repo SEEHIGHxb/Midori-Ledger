@@ -153,6 +153,9 @@ function submitEditScheduleForm(e) {
   }
 
   const id = document.getElementById('editSchedId').value;
+  const existing = MidoriState.schedules.find(s => s.id === id);
+  const newStartDate = document.getElementById('editSchedStartDate').value;
+
   const updatedFields = {
     title: titleValue.trim(),
     amount: Number(amountValue),
@@ -160,10 +163,16 @@ function submitEditScheduleForm(e) {
     walletId: document.getElementById('editSchedWallet').value,
     categoryId: document.getElementById('editSchedCategory').value,
     frequency: document.getElementById('editSchedFrequency').value,
-    startDate: document.getElementById('editSchedStartDate').value,
-    nextDueDate: document.getElementById('editSchedStartDate').value,
+    startDate: newStartDate,
     endDate: document.getElementById('editSchedEndDate').value || null
   };
+
+  // Only reset nextDueDate when the start date actually changed — otherwise
+  // editing an unrelated field (title, amount, ...) would rewind progress
+  // and cause processSchedules() to replay every already-processed occurrence.
+  if (existing && existing.startDate !== newStartDate) {
+    updatedFields.nextDueDate = newStartDate;
+  }
 
   updateSchedule(id, updatedFields);
   closeModal('modalEditSchedule');

@@ -98,7 +98,11 @@ function openEditWalletModal(walletId) {
   document.getElementById('editWalletName').value = wallet.name;
   document.getElementById('editWalletCurrency').value = wallet.currency;
   document.getElementById('editWalletType').value = wallet.type;
-  document.getElementById('editWalletBalance').value = wallet.openingBalance !== undefined ? wallet.openingBalance : wallet.balance;
+  // Default to 0 (not the live running balance) for legacy/imported wallets
+  // that predate the openingBalance field — falling back to the current
+  // balance would silently bake accumulated transaction history into the
+  // "opening" balance the next time it's saved.
+  document.getElementById('editWalletBalance').value = wallet.openingBalance !== undefined ? wallet.openingBalance : 0;
 
   selectedEditWalletColor = wallet.color || '#2d5a27';
   const chips = document.querySelectorAll('#editWalletColorPicker .color-option');
@@ -123,11 +127,21 @@ function submitEditWalletForm(e) {
   }
 
   const id = document.getElementById('editWalletId').value;
-  const openingBalance = Number(document.getElementById('editWalletBalance').value) || 0;
+  const existingWallet = MidoriState.wallets.find(w => w.id === id);
+  const newCurrency = document.getElementById('editWalletCurrency').value;
+  let openingBalance = Number(document.getElementById('editWalletBalance').value) || 0;
+
+  // The balance field is displayed (and edited) in the wallet's currency at
+  // the time the modal was opened. If the currency is also being changed in
+  // this same submit, convert the figure so it isn't silently relabeled into
+  // the new currency at the same numeric value.
+  if (existingWallet && existingWallet.currency !== newCurrency) {
+    openingBalance = convertAmount(openingBalance, existingWallet.currency, newCurrency);
+  }
 
   const updatedFields = {
     name: nameValue.trim(),
-    currency: document.getElementById('editWalletCurrency').value,
+    currency: newCurrency,
     type: document.getElementById('editWalletType').value,
     openingBalance: openingBalance,
     color: selectedEditWalletColor

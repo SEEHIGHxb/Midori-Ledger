@@ -7,15 +7,15 @@
 function getNextOccurrenceDate(dateStr, frequency) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
-  
+
   if (frequency === 'daily') {
-    d.setDate(d.getDate() + 1);
+    d.setUTCDate(d.getUTCDate() + 1);
   } else if (frequency === 'weekly') {
-    d.setDate(d.getDate() + 7);
+    d.setUTCDate(d.getUTCDate() + 7);
   } else if (frequency === 'monthly') {
-    d.setMonth(d.getMonth() + 1);
+    d.setUTCMonth(d.getUTCMonth() + 1);
   } else if (frequency === 'yearly') {
-    d.setFullYear(d.getFullYear() + 1);
+    d.setUTCFullYear(d.getUTCFullYear() + 1);
   }
   return d.toISOString().split('T')[0];
 }

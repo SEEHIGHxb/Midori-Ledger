@@ -372,7 +372,13 @@ function populateDropdowns() {
 
 // Sync Form Category Option Lists based on type (Income vs Expense)
 function openModal(modalId) {
-  document.getElementById(modalId).classList.add('active');
+  const modal = document.getElementById(modalId);
+  modal.classList.add('active');
+  // Clear any leftover validation error from a previous, abandoned attempt
+  // at this same form so it doesn't appear to apply to the new attempt.
+  modal.querySelectorAll('.form-error').forEach((errorEl) => {
+    errorEl.style.display = 'none';
+  });
   // Reset date input inside modal to match Virtual System Date automatically!
   setVirtualDateInputDefaults();
   if (modalId === 'modalTransaction') {

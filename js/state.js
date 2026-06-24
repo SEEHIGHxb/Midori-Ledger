@@ -751,7 +751,7 @@ function isValidStateShape(parsed) {
   const walletsValid = parsed.wallets.every(w => hasRequiredFields(w, ['id', 'name', 'currency']));
   const categoriesValid = parsed.categories.every(c => hasRequiredFields(c, ['id', 'name', 'type']));
   const transactionsValid = parsed.transactions.every(t => hasRequiredFields(t, ['id', 'title', 'amount', 'type', 'walletId', 'date']));
-  const schedulesValid = parsed.schedules.every(s => hasRequiredFields(s, ['id', 'title', 'amount', 'type', 'walletId', 'frequency', 'startDate']));
+  const schedulesValid = parsed.schedules.every(s => hasRequiredFields(s, ['id', 'title', 'amount', 'type', 'walletId', 'frequency', 'startDate', 'nextDueDate']));
 
   return walletsValid && categoriesValid && transactionsValid && schedulesValid;
 }
