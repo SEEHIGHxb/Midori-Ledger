@@ -475,12 +475,34 @@ body.light-theme .date-badge {
   }
 }
 
+.dashboard-bottom-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-bottom-section {
+    grid-template-columns: 1fr;
+  }
+}
+
 .chart-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 24px;
   padding: 24px;
   box-shadow: 0 8px 24px var(--shadow-color);
+  /* Grid items default to min-width: auto, which keeps them pinned to
+     their content's intrinsic width (the chart canvas) — without this,
+     the canvas's width forces the whole grid track wider than the
+     viewport on mobile, even though grid-template-columns is 1fr. */
+  min-width: 0;
+}
+
+.chart-container-large canvas,
+.chart-container-medium canvas {
+  max-width: 100%;
 }
 
 .chart-card h3 {
@@ -760,6 +782,11 @@ body.light-theme .date-badge {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Grid items (e.g. inside .form-row) default to min-width: auto, which
+     pins them to their content's intrinsic width — a <select> with long
+     option text (like "Income Deposit") would otherwise force the row
+     wider than its track and get clipped on narrow viewports. */
+  min-width: 0;
 }
 
 .input-group label {
@@ -787,7 +814,13 @@ body.light-theme .date-badge {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 24px;
-  overflow: hidden;
+  /* overflow: hidden clipped the table's columns entirely on narrow
+     viewports instead of letting users scroll to see them — the table
+     has 6 columns and doesn't reflow into a card layout, so horizontal
+     scroll is the actual fix rather than a layout redesign. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 8px 24px var(--shadow-color);
 }
 
