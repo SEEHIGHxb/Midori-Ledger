@@ -76,7 +76,7 @@ function renderLedger() {
         </div>
       `;
       amountHTML = `
-        <td class="tx-amount-cell" style="color: var(--text-muted); font-weight: 500; font-family:'Outfit'; text-align:right;">
+        <td class="tx-amount-cell" data-label="Amount" style="color: var(--text-muted); font-weight: 500; font-family:'Outfit'; text-align:right;">
           ➔ ${formattedAmount}
         </td>
       `;
@@ -94,7 +94,7 @@ function renderLedger() {
         </span>
       `;
       amountHTML = `
-        <td class="tx-amount-cell ${isIncome ? 'amount-income' : 'amount-expense'}">
+        <td class="tx-amount-cell ${isIncome ? 'amount-income' : 'amount-expense'}" data-label="Amount">
           ${isIncome ? '+' : '-'}${formattedAmount}
         </td>
       `;
@@ -102,21 +102,21 @@ function renderLedger() {
 
     const rowHTML = `
       <tr>
-        <td style="font-weight:600; font-family:'Outfit'; white-space:nowrap;">${formatDisplayDate(tx.date)}</td>
-        <td>
+        <td data-label="Date" style="font-weight:600; font-family:'Outfit'; white-space:nowrap;">${formatDisplayDate(tx.date)}</td>
+        <td data-label="Transaction">
           <div class="tx-title-cell">
             <span class="tx-title-main">${tx.title}</span>
             ${tx.note ? `<span class="tx-title-note">${tx.note}</span>` : ''}
           </div>
         </td>
-        <td>
+        <td data-label="Category Tag">
           ${categoryHTML}
         </td>
-        <td>
+        <td data-label="Wallet">
           ${walletHTML}
         </td>
         ${amountHTML}
-        <td>
+        <td data-label="">
           <div style="display:flex; gap:6px; justify-content:center;">
             <button class="btn-icon-secondary" onclick="openEditTransactionModal('${tx.id}')" title="Edit record" style="background:none; border:none; color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; padding:4px;">
               <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"></path></svg>

@@ -815,13 +815,92 @@ body.light-theme .date-badge {
   border: 1px solid var(--border-color);
   border-radius: 24px;
   /* overflow: hidden clipped the table's columns entirely on narrow
-     viewports instead of letting users scroll to see them — the table
-     has 6 columns and doesn't reflow into a card layout, so horizontal
-     scroll is the actual fix rather than a layout redesign. */
+     viewports instead of letting users scroll to see them. Below 768px
+     the table reflows into cards (see media query below) where scrolling
+     isn't needed; above that, horizontal scroll remains the fallback. */
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   box-shadow: 0 8px 24px var(--shadow-color);
+}
+
+@media (max-width: 768px) {
+  .ledger-table-container {
+    overflow-x: visible;
+  }
+
+  .ledger-table,
+  .ledger-table thead,
+  .ledger-table tbody,
+  .ledger-table tr,
+  .ledger-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ledger-table thead {
+    display: none;
+  }
+
+  .ledger-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 14px 20px;
+  }
+
+  .ledger-table td {
+    border-bottom: none;
+    padding: 0;
+    width: auto;
+  }
+
+  /* Order/size cells so Transaction + Amount (the fields users scan
+     first) sit on the prominent top row of the card, with Date/Category
+     Tag/Wallet as secondary detail below, and actions right-aligned. */
+  .ledger-table td[data-label="Transaction"] {
+    order: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ledger-table td.tx-amount-cell {
+    order: 2;
+    text-align: right;
+  }
+
+  .ledger-table td[data-label="Date"] {
+    order: 3;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .ledger-table td[data-label="Category Tag"],
+  .ledger-table td[data-label="Wallet"] {
+    order: 4;
+  }
+
+  .ledger-table td[data-label=""] {
+    order: 5;
+    margin-left: auto;
+  }
+
+  .ledger-table td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+
+  .ledger-table td[data-label="Date"]::before,
+  .ledger-table td.tx-amount-cell::before {
+    display: none;
+  }
 }
 
 .ledger-table {
