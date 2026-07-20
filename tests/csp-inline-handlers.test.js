@@ -18,6 +18,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+// Comments in these files legitimately quote the forbidden pattern while
+// explaining why it is forbidden, so scan code only.
+const { stripJsComments } = require('./helpers/source-text');
 
 const ROOT = path.join(__dirname, '..');
 const INDEX_HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
@@ -32,15 +35,6 @@ const INLINE_HANDLER_RE = /\son[a-z]+\s*=\s*["']/gi;
 
 function findInlineHandlers(source) {
   return (source.match(INLINE_HANDLER_RE) || []).map((s) => s.trim());
-}
-
-// Comments in these files legitimately quote the forbidden pattern while
-// explaining why it is forbidden, so scan code only. The `[^:]` guard keeps
-// `https://` from being mistaken for a line comment.
-function stripJsComments(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
 test('index.html carries no inline event-handler attributes', () => {

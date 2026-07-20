@@ -1105,13 +1105,22 @@ body.light-theme .date-badge {
   justify-content: center;
   z-index: 100;
   opacity: 0;
+  /* pointer-events blocks the mouse but NOT the keyboard: with opacity alone,
+     the 80 form controls inside these 10 closed modals stayed in the tab order,
+     so tabbing through the app walked invisibly into every hidden form.
+     visibility:hidden removes them from both the tab order and the a11y tree,
+     and unlike display:none it can still be transitioned — delaying it by the
+     fade duration keeps the close animation intact. */
+  visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
 }
 
 .modal-overlay.active {
   opacity: 1;
+  visibility: visible;
   pointer-events: all;
+  transition: opacity 0.3s ease, visibility 0s;
 }
 
 .modal-window {
@@ -1529,6 +1538,10 @@ body.light-theme .date-badge {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* Without this the modal's visibility transition keeps its 0.3s delay while
+       the fade it was hiding is already over, leaving a closed dialog sitting
+       invisible-but-focusable for a third of a second. */
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 

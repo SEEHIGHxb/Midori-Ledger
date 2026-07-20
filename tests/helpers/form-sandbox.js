@@ -20,6 +20,10 @@ class FakeElement {
     this.innerHTML = '';
     this.style = {};
     this.children = [];
+    this.attributes = {};
+    // openModal focuses the dialog after showing it; recorded here rather than
+    // simulated, since there is no real focus ring in this stub.
+    this.focused = false;
     const classes = new Set();
     this.classList = {
       add: (c) => classes.add(c),
@@ -53,6 +57,28 @@ class FakeElement {
   querySelector(selector) {
     return this.querySelectorAll(selector)[0] || null;
   }
+  // The focus-management added to openModal/closeModal touches this handful of
+  // DOM members. querySelectorAll above only matches class selectors, so
+  // querySelector('[role="dialog"]') returns null and openModal falls back to
+  // the overlay itself — which is why setAttribute and focus must exist here.
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
+  }
+  focus() {
+    this.focused = true;
+  }
+  contains(el) {
+    if (el === this) return true;
+    return this.children.some((child) => child.contains && child.contains(el));
+  }
+  // openModal reads this purely to force a synchronous style flush in a real
+  // browser; the value is never used, so 0 is honest rather than a shortcut.
+  get offsetHeight() {
+    return 0;
+  }
 }
 
 function createFormSandbox() {
@@ -66,6 +92,10 @@ function createFormSandbox() {
     },
     createElement: (tag) => new FakeElement(),
     addEventListener: () => {},
+    // openModal stores this so closeModal can restore focus to the opener.
+    // Null is the real value here: these tests call the modal openers directly
+    // rather than clicking a button, so nothing holds focus beforehand.
+    activeElement: null,
     // Color-chip pickers query document-wide (e.g. '#editWalletColorPicker
     // .color-option'); no chips are seeded in these tests, so an empty match
     // list is the correct, real behavior, not a stub shortcut.

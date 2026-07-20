@@ -114,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupNavigation();
   setupDelegatedActions();
   setupDeclaredHandlers();
+  setupModalKeyboard();
 
   // 6. Setup Form Color Pickers
   setupFormColorPickers();
@@ -443,9 +444,53 @@ function populateDropdowns() {
   if (valFilT) filterTag.value = valFilT;
 }
 
+/**
+ * Dialog focus management.
+ *
+ * These modals are plain divs, so nothing gives them dialog behaviour for free.
+ * Before this, focus stayed on whatever button opened the modal, Tab walked
+ * straight out of the dialog into the page behind it, and there was no way to
+ * dismiss one from the keyboard at all. A native <dialog> supplies all of this,
+ * but converting 10 modals would change their stacking and backdrop styling, so
+ * the behaviour is reimplemented over the existing markup instead.
+ */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+  'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Where focus goes when the dialog closes, so keyboard users land back on the
+// control they opened it from rather than at the top of the document.
+let modalReturnFocusTo = null;
+
+function getVisibleFocusable(container) {
+  // These forms show and hide whole rows by transaction type, and a hidden
+  // row's inputs must not become tab stops inside the trap.
+  //
+  // getClientRects() alone is not sufficient: it is empty for display:none but
+  // NOT for visibility:hidden, which still generates layout boxes while being
+  // unfocusable. Measured on the closed overlays, getClientRects() called 72 of
+  // 80 unfocusable controls "visible". The app only ever hides rows with
+  // display:none, so that gap is latent rather than live — but a trap whose
+  // first/last element cannot take focus breaks the wrap silently, so both
+  // checks are applied. checkVisibility is recent, hence the feature test:
+  // older Android WebViews fall back to the getClientRects result.
+  return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) => {
+    if (el.getClientRects().length === 0) return false;
+    return typeof el.checkVisibility === 'function'
+      ? el.checkVisibility({ visibilityProperty: true })
+      : true;
+  });
+}
+
+function getTopmostOpenModal() {
+  const open = document.querySelectorAll('.modal-overlay.active');
+  return open.length ? open[open.length - 1] : null;
+}
+
 // Sync Form Category Option Lists based on type (Income vs Expense)
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
+  modalReturnFocusTo = document.activeElement;
   modal.classList.add('active');
   // Clear any leftover validation error from a previous, abandoned attempt
   // at this same form so it doesn't appear to apply to the new attempt.
@@ -457,10 +502,72 @@ function openModal(modalId) {
   if (modalId === 'modalTransaction') {
     syncTransactionCurrencyDefault();
   }
+
+  // Focus the dialog itself rather than its first field: that announces the
+  // title to a screen reader without popping the on-screen keyboard open on
+  // every modal, which on a phone-sized ledger covers the form being filled.
+  const dialog = modal.querySelector('[role="dialog"]') || modal;
+  dialog.setAttribute('tabindex', '-1');
+  // focus() is a no-op while the overlay is still visibility:hidden, and .active
+  // was only added this tick, so the new style has to land first. Reading
+  // offsetHeight forces that flush synchronously.
+  //
+  // requestAnimationFrame would be the obvious way to wait, and it is wrong
+  // here: rAF does not fire while the document is hidden, so a modal opened in
+  // a backgrounded tab never received focus at all. Measured directly — with
+  // visibilityState 'hidden', the rAF version left focus on the opener button.
+  void modal.offsetHeight;
+  dialog.focus();
 }
 
 function closeModal(modalId) {
   document.getElementById(modalId).classList.remove('active');
+  if (modalReturnFocusTo && typeof modalReturnFocusTo.focus === 'function') {
+    modalReturnFocusTo.focus();
+  }
+  modalReturnFocusTo = null;
+}
+
+function setupModalKeyboard() {
+  document.addEventListener('keydown', (event) => {
+    const modal = getTopmostOpenModal();
+    if (!modal) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeModal(modal.id);
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
+
+    const focusable = getVisibleFocusable(modal);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    // Wrap at both ends.
+    //
+    // The container case matters and is easy to miss: openModal focuses the
+    // dialog element itself, which is inside the modal but is not `first`, so a
+    // naive check matches neither branch, skips preventDefault, and lets the
+    // browser's own shift+Tab carry focus backwards out of the dialog — from
+    // the very position every dialog starts in. Synthetic KeyboardEvents do not
+    // move focus, so a scripted test reports this as passing; it has to be
+    // exercised with a real keypress.
+    const dialogEl = modal.querySelector('[role="dialog"]');
+    const atStart = document.activeElement === first
+      || document.activeElement === dialogEl
+      || !modal.contains(document.activeElement);
+
+    if (event.shiftKey && atStart) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
 }
 
 function setupFormColorPickers() {
