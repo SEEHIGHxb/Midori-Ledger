@@ -4,8 +4,20 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+        Backup is off on purpose. The WebView's localStorage holds the whole
+        ledger plus preferences.syncKey, the symmetric key that decrypts every
+        ZenSync blob. Android's Auto Backup would copy that data directory to
+        the user's Google Drive, moving a finance app's plaintext records and
+        its encryption key onto a third-party service the user never opted
+        into for this purpose. dataExtractionRules covers API 31+, where cloud
+        backup and device-to-device transfer are governed separately.
+        Migration is meant to go through the app's own export/import or sync.
+    -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="Midori"
         android:roundIcon="@mipmap/ic_launcher_round"

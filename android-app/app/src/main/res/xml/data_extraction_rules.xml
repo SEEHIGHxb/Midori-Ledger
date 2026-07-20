@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ (API 31+) splits what allowBackup used to cover into two
+    independent channels, so turning backup off in the manifest is not on its
+    own enough: cloud-backup and device-transfer must each be addressed.
+
+    Both are excluded here. The app's data directory contains the WebView's
+    localStorage, which stores the full ledger and preferences.syncKey — the
+    key that decrypts every ZenSync payload. Neither should be copied to Google
+    Drive nor streamed to another handset during setup. Users move their data
+    with the in-app export/import or by signing in to sync on the new device.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

@@ -21,8 +21,34 @@ function isValidFrequency(frequency) {
 // than a frozen tab.
 const MAX_OCCURRENCES_PER_RUN = 10000;
 
-// Helper to compute next date based on frequency
-function getNextOccurrenceDate(dateStr, frequency) {
+function daysInUTCMonth(year, monthIndex) {
+  // Day 0 of the following month is the last day of this one.
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+}
+
+// The day-of-month a schedule's occurrences should land on. startDate is the
+// user's stated intent; nextDueDate is the fallback for rows written before
+// this mattered, so an already-drifted schedule keeps its current day rather
+// than silently jumping to a different one.
+function getScheduleAnchorDay(schedule) {
+  const source = schedule && (schedule.startDate || schedule.nextDueDate);
+  if (!source) return null;
+  const d = new Date(source);
+  return isNaN(d.getTime()) ? null : d.getUTCDate();
+}
+
+// Helper to compute next date based on frequency.
+//
+// Monthly and yearly recurrence anchors on anchorDay and clamps to the last
+// day of a short month instead of spilling into the next one. Plain
+// setUTCMonth(+1) arithmetic sends Jan 31 to Mar 3, and because each step
+// reads the *previous* result rather than the original day, that drift is
+// permanent: rent due on the 31st migrates to the 3rd and never comes back.
+// Anchored, it goes Jan 31 -> Feb 28 -> Mar 31, which is what every calendar
+// and billing system does. Callers that have the schedule should pass
+// getScheduleAnchorDay(schedule); omitting it falls back to the day in
+// dateStr, preserving the old single-argument behaviour.
+function getNextOccurrenceDate(dateStr, frequency, anchorDay) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
 
@@ -30,10 +56,20 @@ function getNextOccurrenceDate(dateStr, frequency) {
     d.setUTCDate(d.getUTCDate() + 1);
   } else if (frequency === 'weekly') {
     d.setUTCDate(d.getUTCDate() + 7);
-  } else if (frequency === 'monthly') {
-    d.setUTCMonth(d.getUTCMonth() + 1);
-  } else if (frequency === 'yearly') {
-    d.setUTCFullYear(d.getUTCFullYear() + 1);
+  } else if (frequency === 'monthly' || frequency === 'yearly') {
+    const parsedAnchor = Number(anchorDay);
+    const day = Number.isInteger(parsedAnchor) && parsedAnchor >= 1 && parsedAnchor <= 31
+      ? parsedAnchor
+      : d.getUTCDate();
+    // Land on the 1st before shifting: from Jan 31, setUTCMonth(+1) would
+    // already have overflowed into March and we would clamp the wrong month.
+    d.setUTCDate(1);
+    if (frequency === 'monthly') {
+      d.setUTCMonth(d.getUTCMonth() + 1);
+    } else {
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
+    }
+    d.setUTCDate(Math.min(day, daysInUTCMonth(d.getUTCFullYear(), d.getUTCMonth())));
   }
   return d.toISOString().split('T')[0];
 }
@@ -56,6 +92,7 @@ function processSchedules(targetDateStr) {
     }
 
     let nextDue = schedule.nextDueDate;
+    const anchorDay = getScheduleAnchorDay(schedule);
     let iterations = 0;
     // Process all occurrences until nextDue is strictly after the targetDateStr
     while (nextDue <= targetDateStr) {
@@ -96,7 +133,7 @@ function processSchedules(targetDateStr) {
       // 2. Advance schedule nextDueDate.
       // The date MUST move strictly forward; if it ever fails to, stop rather
       // than spin (e.g. an unparseable startDate returns itself unchanged).
-      const advanced = getNextOccurrenceDate(nextDue, schedule.frequency);
+      const advanced = getNextOccurrenceDate(nextDue, schedule.frequency, anchorDay);
       if (advanced <= nextDue) {
         console.error(`Schedule "${schedule.title}" failed to advance past ${nextDue}; deactivating it.`);
         schedule.active = false;
@@ -140,12 +177,13 @@ function updateVirtualDate(newDateStr) {
         return;
       }
       let nextDue = schedule.startDate;
+      const anchorDay = getScheduleAnchorDay(schedule);
       let iterations = 0;
       while (nextDue <= newDateStr) {
         if (schedule.endDate && nextDue > schedule.endDate) {
           break;
         }
-        const advanced = getNextOccurrenceDate(nextDue, schedule.frequency);
+        const advanced = getNextOccurrenceDate(nextDue, schedule.frequency, anchorDay);
         if (advanced <= nextDue || ++iterations > MAX_OCCURRENCES_PER_RUN) {
           console.error(`Schedule "${schedule.title}" failed to advance past ${nextDue} during rollback; leaving it here.`);
           break;
@@ -208,6 +246,7 @@ function get30DayForecast() {
     if (!isValidFrequency(schedule.frequency)) return; // never forecast an unadvanceable schedule
 
     let checkDate = schedule.nextDueDate;
+    const anchorDay = getScheduleAnchorDay(schedule);
     let iterations = 0;
     const baseWallet = MidoriState.wallets.find(w => w.id === schedule.walletId);
     const schedCurrency = schedule.currency || (baseWallet ? baseWallet.currency : MidoriState.preferences.baseCurrency);
@@ -237,7 +276,7 @@ function get30DayForecast() {
         walletName: baseWallet ? baseWallet.name : 'Unknown'
       });
       
-      checkDate = getNextOccurrenceDate(checkDate, schedule.frequency);
+      checkDate = getNextOccurrenceDate(checkDate, schedule.frequency, anchorDay);
     }
   });
 

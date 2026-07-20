@@ -40,16 +40,20 @@ function renderDashboardMetrics() {
   document.getElementById('monthlyExpenseDisplay').innerText = formatCurrency(monthlyExpense, baseCurrency);
 
   // 3. Compute Savings Rate
+  // The reported rate is deliberately not floored at 0. Clamping made a month
+  // that overspent income by 180% read as "0%" — identical to breaking exactly
+  // even — which is precisely the case a ledger must not flatten. Only the bar
+  // width is clamped, since a negative width is not renderable.
   let savingsRate = 0;
   if (monthlyIncome > 0) {
     const saved = monthlyIncome - monthlyExpense;
-    savingsRate = Math.max(0, Math.min(100, Math.round((saved / monthlyIncome) * 100)));
+    savingsRate = Math.round((saved / monthlyIncome) * 100);
   }
-  
+
   document.getElementById('savingsRateDisplay').innerText = `${savingsRate}%`;
-  
+
   const savingsProgress = document.getElementById('savingsRateProgress');
-  savingsProgress.style.width = `${savingsRate}%`;
+  savingsProgress.style.width = `${Math.max(0, Math.min(100, savingsRate))}%`;
 
   // Set visual alert states for savings progress bar
   savingsProgress.className = 'metric-progress-fill'; // reset

@@ -3,7 +3,7 @@
  * sw.js: Service Worker for complete offline capabilities
  */
 
-const CACHE_NAME = 'midori-cache-v14';
+const CACHE_NAME = 'midori-cache-v15';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -54,33 +54,61 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event (Cache-first with Network Fallback)
+function cachePut(request, response) {
+  const copy = response.clone();
+  caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+}
+
+// Fetch Event — network-first for navigations, cache-first for static assets
 self.addEventListener('fetch', (event) => {
-  // Only handle standard http/https schemes (avoid chrome-extension:// or file:// requests)
-  if (!event.request.url.startsWith(self.location.origin)) {
+  const request = event.request;
+
+  // cache.put() throws on a non-GET request, and the FX/sync POSTs must reach
+  // the network untouched, so only same-origin GETs are handled here. Anything
+  // else (cross-origin, chrome-extension://, file://) falls through to the
+  // browser's default handling.
+  if (request.method !== 'GET') return;
+  if (!request.url.startsWith(self.location.origin)) return;
+
+  // Navigations go network-first. Cache-first pinned each user to whichever
+  // index.html they happened to install: a shipped fix only reached them if
+  // CACHE_NAME was also bumped, a manual step that is easy to forget and that
+  // silently strands everyone who already has the app. Falling back to the
+  // cache keeps the app fully usable offline.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            cachePut(request, networkResponse);
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('./index.html')))
+    );
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
 
-      return fetch(event.request)
+      return fetch(request)
         .then((networkResponse) => {
           // If response is valid, cache a clone of it
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
+            cachePut(request, networkResponse);
           }
           return networkResponse;
         })
         .catch(() => {
-          // Offline fallback
-          console.warn('[Service Worker] Fetch failed, device is offline.');
+          // Returning undefined here made respondWith reject, which the page
+          // saw as an unexplained network error. An explicit 504 at least
+          // names the cause.
+          console.warn('[Service Worker] Offline and not cached:', request.url);
+          return new Response('', { status: 504, statusText: 'Offline' });
         });
     })
   );

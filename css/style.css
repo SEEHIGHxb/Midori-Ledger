@@ -1511,3 +1511,29 @@ body.light-theme .date-badge {
   animation: sync-pulse 2s infinite ease-in-out;
 }
 
+/*
+  Respect the OS "reduce motion" setting. Users who enable it often do so
+  because vestibular disorders make transform and scale animations physically
+  unpleasant, and this stylesheet has ~35 transitions plus several infinite
+  loops (the sync pulse, the breathing loader) that ran regardless.
+
+  Motion is reduced rather than removed: durations collapse to ~1ms so
+  transitionend/animationend listeners still fire and any state that depends
+  on them cannot stall. Infinite decorative loops are stopped outright, since
+  a 1ms infinite animation is worse than none.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .sync-icon-pulse {
+    animation: none !important;
+  }
+}
+

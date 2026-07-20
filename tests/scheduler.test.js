@@ -23,10 +23,72 @@ test('getNextOccurrenceDate advances by the given frequency', () => {
   assert.strictEqual(sandbox.getNextOccurrenceDate('2026-06-24', 'yearly'), '2027-06-24');
 });
 
-test('getNextOccurrenceDate rolls into the next month when the day overflows', () => {
+test('getNextOccurrenceDate clamps to the last day of a short month', () => {
   const sandbox = createSandbox();
-  // Jan 31 + 1 month -> Feb 2026 only has 28 days, so it overflows to Mar 3.
-  assert.strictEqual(sandbox.getNextOccurrenceDate('2026-01-31', 'monthly'), '2026-03-03');
+  // Previously this overflowed to 2026-03-03: Feb 2026 has 28 days, and
+  // setUTCMonth(+1) rolls the surplus into the following month.
+  assert.strictEqual(sandbox.getNextOccurrenceDate('2026-01-31', 'monthly', 31), '2026-02-28');
+  assert.strictEqual(sandbox.getNextOccurrenceDate('2026-01-30', 'monthly', 30), '2026-02-28');
+  assert.strictEqual(sandbox.getNextOccurrenceDate('2028-01-31', 'monthly', 31), '2028-02-29', 'leap year');
+});
+
+test('getNextOccurrenceDate returns to the anchor day after a short month', () => {
+  const sandbox = createSandbox();
+  // The bug that mattered was not the single hop but the drift: without an
+  // anchor each step reads the previous result, so "the 31st" became "the 3rd"
+  // permanently. Walking a full year must keep landing on the anchor.
+  const anchor = 31;
+  let date = '2026-01-31';
+  const days = [];
+  for (let i = 0; i < 12; i++) {
+    date = sandbox.getNextOccurrenceDate(date, 'monthly', anchor);
+    days.push(Number(date.split('-')[2]));
+  }
+
+  assert.deepStrictEqual(days, [28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]);
+  assert.strictEqual(date, '2027-01-31', 'a year of hops must return to the 31st');
+});
+
+test('getNextOccurrenceDate clamps a Feb 29 yearly schedule to Feb 28', () => {
+  const sandbox = createSandbox();
+  assert.strictEqual(sandbox.getNextOccurrenceDate('2028-02-29', 'yearly', 29), '2029-02-28');
+});
+
+test('getNextOccurrenceDate falls back to the date it was given without an anchor', () => {
+  const sandbox = createSandbox();
+  assert.strictEqual(sandbox.getNextOccurrenceDate('2026-06-24', 'monthly'), '2026-07-24');
+  // No anchor and a short target month: clamp against the date's own day.
+  assert.strictEqual(sandbox.getNextOccurrenceDate('2026-01-31', 'monthly'), '2026-02-28');
+});
+
+test('getScheduleAnchorDay prefers startDate and tolerates junk', () => {
+  const sandbox = createSandbox();
+  assert.strictEqual(sandbox.getScheduleAnchorDay({ startDate: '2026-01-31', nextDueDate: '2026-03-03' }), 31);
+  assert.strictEqual(sandbox.getScheduleAnchorDay({ nextDueDate: '2026-03-03' }), 3, 'falls back to nextDueDate');
+  assert.strictEqual(sandbox.getScheduleAnchorDay({ startDate: 'not-a-date' }), null);
+  assert.strictEqual(sandbox.getScheduleAnchorDay({}), null);
+  assert.strictEqual(sandbox.getScheduleAnchorDay(null), null);
+});
+
+test('processSchedules keeps a month-end schedule on its anchor day', () => {
+  const sandbox = createSandbox();
+  sandbox.__setState(baseState({
+    virtualDate: '2026-01-31',
+    schedules: [{
+      id: 'sched31', title: 'Rent', active: true, frequency: 'monthly',
+      startDate: '2026-01-31', nextDueDate: '2026-01-31', walletId: 'w1',
+      categoryId: 'cat1', currency: 'JPY', amount: 100, type: 'expense', endDate: null,
+    }],
+  }));
+
+  sandbox.processSchedules('2026-04-30');
+
+  const state = sandbox.__getState();
+  const dates = state.transactions.map(t => t.date);
+  // Before the fix: 2026-01-31, 2026-03-03, 2026-04-03 — one occurrence lost
+  // in February and the due day drifted for good.
+  assert.deepStrictEqual(dates, ['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30']);
+  assert.strictEqual(state.schedules[0].nextDueDate, '2026-05-31');
 });
 
 test('getNextOccurrenceDate returns the input unchanged for an unparseable date', () => {
