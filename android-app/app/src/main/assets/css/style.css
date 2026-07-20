@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Noto+Serif+JP:wght@400;600;700&display=swap');
+/* Fonts are self-hosted in css/fonts.css. There used to be an @import to
+   fonts.googleapis.com here as well as the <link> in index.html — two
+   independent references to the same CDN, so removing only the visible one left
+   the request intact. It also pulled Noto Serif JP for .kanji-sub, a rule no
+   markup uses. Keep font loading in fonts.css; do not reintroduce an @import. */
 
 /* ==========================================================================
    Design Tokens & Theme Variables (Midori Leafy-Green Style)
@@ -80,7 +84,12 @@ h1, h2, h3, h4, .font-title {
 }
 
 .kanji-sub {
-  font-family: 'Noto Serif JP', serif;
+  /* No markup uses this class — it is kept only because it is harmless and may
+     be wanted again. 'Noto Serif JP' was declared here and really was being
+     downloaded, via the @import that used to head this file, so every page load
+     fetched a CJK family for a rule that never rendered. Dropped rather than
+     self-hosted; if the kanji subtitle is ever added back, subset the font to
+     the glyphs actually used rather than shipping the whole family. */
   font-size: 0.85em;
   opacity: 0.6;
   margin-left: 4px;

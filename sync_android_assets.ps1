@@ -24,5 +24,9 @@ Copy-Item -Path (Join-Path $sourceDir "sw.js") -Destination (Join-Path $assetsDi
 Copy-Item -Path (Join-Path $sourceDir "js") -Destination $assetsDir -Recurse -Force
 Copy-Item -Path (Join-Path $sourceDir "css") -Destination $assetsDir -Recurse -Force
 Copy-Item -Path (Join-Path $sourceDir "image") -Destination $assetsDir -Recurse -Force
+# Self-hosted webfonts. The wrapper has no network path to a CDN, so omitting
+# this directory ships an APK whose typography silently falls back to system
+# fonts — the exact failure that moving the fonts off Google Fonts fixed.
+Copy-Item -Path (Join-Path $sourceDir "fonts") -Destination $assetsDir -Recurse -Force
 
 Write-Host "Asset synchronisation finished successfully! Midori is ready to compile into a native Android app." -ForegroundColor Green

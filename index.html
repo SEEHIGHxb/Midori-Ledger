@@ -18,8 +18,8 @@
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self' file:;
     script-src 'self' file:;
-    style-src 'self' file: 'unsafe-inline' https://fonts.googleapis.com;
-    font-src 'self' file: data: https://fonts.gstatic.com;
+    style-src 'self' file: 'unsafe-inline';
+    font-src 'self' file: data:;
     img-src 'self' file: data: blob:;
     connect-src 'self' file: https://open.er-api.com https://kvdb.io;
     media-src 'self' file: blob:;
@@ -40,10 +40,12 @@
   <meta name="apple-mobile-web-app-title" content="Midori — Leafy Ledger">
   <link rel="apple-touch-icon" href="image/midori.png">
 
-  <!-- Beautiful Typography and Visual Customization -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Beautiful Typography and Visual Customization.
+       Fonts are self-hosted (see css/fonts.css). They were loaded from
+       fonts.googleapis.com, which told a third party about every page load of a
+       finance app, and — because sw.js only caches same-origin requests — was
+       the one asset that never worked offline or under the file:// wrapper. -->
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/style.css">
   <!-- Chart.js for High-Fidelity Interactive Visualizations.
        Vendored (pinned v4.5.1, MIT) rather than loaded from a CDN: an unpinned

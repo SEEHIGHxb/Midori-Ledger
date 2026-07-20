@@ -1,0 +1,43 @@
+/**
+ * Self-hosted webfonts.
+ *
+ * These were loaded from fonts.googleapis.com until now. Three reasons that
+ * moved here, matching the rule already applied to Chart.js/jsQR/qrcode:
+ *
+ *   1. Privacy. The stylesheet link announced every page load to a third party,
+ *      from a personal finance app.
+ *   2. Offline. The service worker only caches same-origin requests, so the
+ *      fonts were the one asset that never survived going offline.
+ *   3. The Android wrapper. It loads the page from file:///android_asset/, where
+ *      the CDN request has no network context at all and silently fell back.
+ *
+ * Both files are the `latin` subset only (the app's UI text), taken from the
+ * exact URLs the old <link> resolved to: Inter v20 and Outfit v15, SIL Open
+ * Font License 1.1. They are variable fonts spanning the whole weight range,
+ * which is why one file per family covers every weight the UI asks for —
+ * 80 KB total rather than the 11 static files the request implied.
+ *
+ * No unicode-range is declared. With only the latin subset present, a glyph
+ * outside it simply falls through to the generic family in the stack, which is
+ * the behaviour wanted here; unicode-range would only add a load optimisation
+ * that is meaningless for two already-cached local files.
+ *
+ * To update: re-download from the Google Fonts CSS with a browser User-Agent
+ * (it serves .ttf to unrecognised agents), then re-run `npm run sync-android`.
+ */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('../fonts/inter-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('../fonts/outfit-latin.woff2') format('woff2');
+}

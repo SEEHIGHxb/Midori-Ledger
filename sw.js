@@ -3,12 +3,17 @@
  * sw.js: Service Worker for complete offline capabilities
  */
 
-const CACHE_NAME = 'midori-cache-v18';
+const CACHE_NAME = 'midori-cache-v19';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './css/style.css',
+  // Self-hosted so the UI keeps its typography offline; the old CDN <link> was
+  // cross-origin, which the fetch handler skips, so fonts never cached.
+  './css/fonts.css',
+  './fonts/inter-latin.woff2',
+  './fonts/outfit-latin.woff2',
   './js/state.js',
   './js/scheduler.js',
   './js/charts.js',
