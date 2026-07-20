@@ -475,12 +475,34 @@ body.light-theme .date-badge {
   }
 }
 
+.dashboard-bottom-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-bottom-section {
+    grid-template-columns: 1fr;
+  }
+}
+
 .chart-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 24px;
   padding: 24px;
   box-shadow: 0 8px 24px var(--shadow-color);
+  /* Grid items default to min-width: auto, which keeps them pinned to
+     their content's intrinsic width (the chart canvas) — without this,
+     the canvas's width forces the whole grid track wider than the
+     viewport on mobile, even though grid-template-columns is 1fr. */
+  min-width: 0;
+}
+
+.chart-container-large canvas,
+.chart-container-medium canvas {
+  max-width: 100%;
 }
 
 .chart-card h3 {
@@ -760,6 +782,11 @@ body.light-theme .date-badge {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Grid items (e.g. inside .form-row) default to min-width: auto, which
+     pins them to their content's intrinsic width — a <select> with long
+     option text (like "Income Deposit") would otherwise force the row
+     wider than its track and get clipped on narrow viewports. */
+  min-width: 0;
 }
 
 .input-group label {
@@ -787,8 +814,93 @@ body.light-theme .date-badge {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 24px;
-  overflow: hidden;
+  /* overflow: hidden clipped the table's columns entirely on narrow
+     viewports instead of letting users scroll to see them. Below 768px
+     the table reflows into cards (see media query below) where scrolling
+     isn't needed; above that, horizontal scroll remains the fallback. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 8px 24px var(--shadow-color);
+}
+
+@media (max-width: 768px) {
+  .ledger-table-container {
+    overflow-x: visible;
+  }
+
+  .ledger-table,
+  .ledger-table thead,
+  .ledger-table tbody,
+  .ledger-table tr,
+  .ledger-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ledger-table thead {
+    display: none;
+  }
+
+  .ledger-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 14px 20px;
+  }
+
+  .ledger-table td {
+    border-bottom: none;
+    padding: 0;
+    width: auto;
+  }
+
+  /* Order/size cells so Transaction + Amount (the fields users scan
+     first) sit on the prominent top row of the card, with Date/Category
+     Tag/Wallet as secondary detail below, and actions right-aligned. */
+  .ledger-table td[data-label="Transaction"] {
+    order: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ledger-table td.tx-amount-cell {
+    order: 2;
+    text-align: right;
+  }
+
+  .ledger-table td[data-label="Date"] {
+    order: 3;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .ledger-table td[data-label="Category Tag"],
+  .ledger-table td[data-label="Wallet"] {
+    order: 4;
+  }
+
+  .ledger-table td[data-label=""] {
+    order: 5;
+    margin-left: auto;
+  }
+
+  .ledger-table td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+
+  .ledger-table td[data-label="Date"]::before,
+  .ledger-table td.tx-amount-cell::before {
+    display: none;
+  }
 }
 
 .ledger-table {
@@ -1051,6 +1163,49 @@ body.light-theme .date-badge {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.form-error {
+  display: none;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(220, 53, 69, 0.12);
+  color: #dc3545;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.midori-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 16px);
+  max-width: 90vw;
+  padding: 12px 20px;
+  border-radius: 10px;
+  background: #dc3545;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 9999;
+}
+
+.midori-toast.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.fx-rates-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  opacity: 0.6;
 }
 
 .form-row {

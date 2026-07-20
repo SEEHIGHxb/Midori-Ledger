@@ -3,7 +3,7 @@
  * sw.js: Service Worker for complete offline capabilities
  */
 
-const CACHE_NAME = 'midori-cache-v11';
+const CACHE_NAME = 'midori-cache-v14';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -12,9 +12,19 @@ const ASSETS_TO_CACHE = [
   './js/state.js',
   './js/scheduler.js',
   './js/charts.js',
-  './js/app.js',
+  './js/dashboard.js',
+  './js/wallets.js',
+  './js/categories-budgets.js',
+  './js/transactions.js',
+  './js/schedules.js',
+  './js/sync.js',
+  './js/ui-core.js',
+  './js/sw-register.js',
   './js/qrcode.min.js',
   './js/jsqr.min.js',
+  // Vendored so charts still render with no network. While this was a CDN tag
+  // the fetch handler skipped it (cross-origin) and the dashboard came up blank offline.
+  './js/chart.umd.min.js',
   './image/midori.png'
 ];
 

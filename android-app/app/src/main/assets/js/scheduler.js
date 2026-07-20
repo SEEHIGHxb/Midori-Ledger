@@ -3,19 +3,37 @@
  * scheduler.js: Recurrence Processor & Simulated Date Engine
  */
 
+// The only recurrence frequencies the engine can advance. Anything else makes
+// getNextOccurrenceDate() a fixed point (it returns its input unchanged), which
+// turns every `while (nextDue <= target)` loop below into an infinite loop that
+// pushes transactions until the tab runs out of memory. Values reach us not
+// only from the <select> but from imported backups and cloud pulls, so they
+// must be treated as untrusted.
+const VALID_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'];
+
+function isValidFrequency(frequency) {
+  return VALID_FREQUENCIES.indexOf(frequency) !== -1;
+}
+
+// Runaway backstop for the occurrence loops. Far above any realistic ledger
+// (27+ years of daily recurrence) so it never trips in normal use — it exists
+// only so an unforeseen non-advancing case degrades into a logged error rather
+// than a frozen tab.
+const MAX_OCCURRENCES_PER_RUN = 10000;
+
 // Helper to compute next date based on frequency
 function getNextOccurrenceDate(dateStr, frequency) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
-  
+
   if (frequency === 'daily') {
-    d.setDate(d.getDate() + 1);
+    d.setUTCDate(d.getUTCDate() + 1);
   } else if (frequency === 'weekly') {
-    d.setDate(d.getDate() + 7);
+    d.setUTCDate(d.getUTCDate() + 7);
   } else if (frequency === 'monthly') {
-    d.setMonth(d.getMonth() + 1);
+    d.setUTCMonth(d.getUTCMonth() + 1);
   } else if (frequency === 'yearly') {
-    d.setFullYear(d.getFullYear() + 1);
+    d.setUTCFullYear(d.getUTCFullYear() + 1);
   }
   return d.toISOString().split('T')[0];
 }
@@ -28,11 +46,27 @@ function processSchedules(targetDateStr) {
   
   schedules.forEach(schedule => {
     if (!schedule.active) return;
-    
+
+    // Reject unusable recurrence data up front rather than looping on it.
+    if (!isValidFrequency(schedule.frequency)) {
+      console.error(`Schedule "${schedule.title}" has an unsupported frequency "${schedule.frequency}"; deactivating it instead of processing.`);
+      schedule.active = false;
+      stateChanged = true;
+      return;
+    }
+
     let nextDue = schedule.nextDueDate;
+    let iterations = 0;
     // Process all occurrences until nextDue is strictly after the targetDateStr
     while (nextDue <= targetDateStr) {
       if (schedule.endDate && nextDue > schedule.endDate) {
+        schedule.active = false;
+        stateChanged = true;
+        break;
+      }
+
+      if (++iterations > MAX_OCCURRENCES_PER_RUN) {
+        console.error(`Schedule "${schedule.title}" exceeded ${MAX_OCCURRENCES_PER_RUN} occurrences in one run; deactivating to protect the app.`);
         schedule.active = false;
         stateChanged = true;
         break;
@@ -59,10 +93,19 @@ function processSchedules(targetDateStr) {
       newTx.id = generateUUID();
       MidoriState.transactions.push(newTx);
       
-      // 2. Advance schedule nextDueDate
-      nextDue = getNextOccurrenceDate(nextDue, schedule.frequency);
+      // 2. Advance schedule nextDueDate.
+      // The date MUST move strictly forward; if it ever fails to, stop rather
+      // than spin (e.g. an unparseable startDate returns itself unchanged).
+      const advanced = getNextOccurrenceDate(nextDue, schedule.frequency);
+      if (advanced <= nextDue) {
+        console.error(`Schedule "${schedule.title}" failed to advance past ${nextDue}; deactivating it.`);
+        schedule.active = false;
+        stateChanged = true;
+        break;
+      }
+      nextDue = advanced;
       schedule.nextDueDate = nextDue;
-      
+
       stateChanged = true;
     }
   });
@@ -91,12 +134,23 @@ function updateVirtualDate(newDateStr) {
     
     // Recalculate nextDueDate for all schedules back to the new date
     MidoriState.schedules.forEach(schedule => {
+      if (!isValidFrequency(schedule.frequency)) {
+        console.error(`Schedule "${schedule.title}" has an unsupported frequency "${schedule.frequency}"; skipping rollback recalculation.`);
+        schedule.active = false;
+        return;
+      }
       let nextDue = schedule.startDate;
+      let iterations = 0;
       while (nextDue <= newDateStr) {
         if (schedule.endDate && nextDue > schedule.endDate) {
           break;
         }
-        nextDue = getNextOccurrenceDate(nextDue, schedule.frequency);
+        const advanced = getNextOccurrenceDate(nextDue, schedule.frequency);
+        if (advanced <= nextDue || ++iterations > MAX_OCCURRENCES_PER_RUN) {
+          console.error(`Schedule "${schedule.title}" failed to advance past ${nextDue} during rollback; leaving it here.`);
+          break;
+        }
+        nextDue = advanced;
       }
       schedule.nextDueDate = nextDue;
       // Reactivate if it was expired but is now active in this rolled back date
@@ -151,15 +205,18 @@ function get30DayForecast() {
 
   MidoriState.schedules.forEach(schedule => {
     if (!schedule.active) return;
-    
+    if (!isValidFrequency(schedule.frequency)) return; // never forecast an unadvanceable schedule
+
     let checkDate = schedule.nextDueDate;
+    let iterations = 0;
     const baseWallet = MidoriState.wallets.find(w => w.id === schedule.walletId);
     const schedCurrency = schedule.currency || (baseWallet ? baseWallet.currency : MidoriState.preferences.baseCurrency);
-    
+
     while (checkDate <= endLimitStr) {
       if (schedule.endDate && checkDate > schedule.endDate) {
         break;
       }
+      if (++iterations > MAX_OCCURRENCES_PER_RUN) break;
 
       // Convert schedule amount to standard base currency
       const amountInBase = convertAmount(schedule.amount, schedCurrency, MidoriState.preferences.baseCurrency);

@@ -16,7 +16,8 @@ const SVG_ICONS = {
   shoppingBag: `<svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>`
 };
 
-// Supported Currencies
+// Supported Currencies — rates below are the offline fallback table, used
+// when the live FX fetch fails or the device is offline. See refreshFxRates().
 const CURRENCIES = {
   USD: { symbol: '$', name: 'US Dollar', rate: 1.00 },
   THB: { symbol: '฿', name: 'Thai Baht', rate: 36.50 },
@@ -24,6 +25,53 @@ const CURRENCIES = {
   CNY: { symbol: '¥', name: 'Chinese Yuan', rate: 7.24 },
   JPY: { symbol: '¥', name: 'Japanese Yen', rate: 156.20 }
 };
+
+const FX_API_URL = 'https://open.er-api.com/v6/latest/USD';
+const FX_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // refresh at most once a day
+
+// Apply a {CODE: rate} map (relative to USD) onto the in-memory CURRENCIES table
+function applyFxRates(rates) {
+  Object.keys(CURRENCIES).forEach(code => {
+    if (code === 'USD') return; // USD is always the 1.00 base
+    if (rates && rates[code] !== undefined && Number.isFinite(rates[code])) {
+      CURRENCIES[code].rate = rates[code];
+    }
+  });
+}
+
+// Fetch live FX rates, falling back to the cached or hardcoded rates when
+// offline/unreachable. Safe to call on every app load — it self-throttles.
+async function refreshFxRates() {
+  const cache = MidoriState.fxRatesCache;
+  const now = Date.now();
+
+  if (cache && cache.rates && (now - cache.fetchedAt) < FX_REFRESH_INTERVAL_MS) {
+    applyFxRates(cache.rates);
+    return;
+  }
+
+  try {
+    const response = await fetch(FX_API_URL);
+    if (!response.ok) throw new Error(`FX fetch failed with status ${response.status}`);
+    const data = await response.json();
+    if (!data || !data.rates) throw new Error('FX response missing rates field');
+
+    const rates = {};
+    Object.keys(CURRENCIES).forEach(code => {
+      if (data.rates[code] !== undefined) rates[code] = data.rates[code];
+    });
+
+    applyFxRates(rates);
+    MidoriState.fxRatesCache = { rates, fetchedAt: now };
+    saveState();
+  } catch (e) {
+    console.warn('Could not refresh live FX rates; using cached/fallback rates instead.', e);
+    if (cache && cache.rates) {
+      applyFxRates(cache.rates);
+    }
+    // else: hardcoded fallback rates in CURRENCIES remain in effect untouched
+  }
+}
 
 // Helper for dynamic local device date
 function getDeviceTodayDateStr() {
@@ -50,7 +98,8 @@ let MidoriState = {
     lastSyncedAt: 0
   },
   virtualDate: '2026-05-20',
-  updatedAt: 0
+  updatedAt: 0,
+  fxRatesCache: null
 };
 
 const LOCAL_STORAGE_KEY = 'midori_ledger_state';
@@ -60,6 +109,19 @@ function convertAmount(amount, from, to) {
   if (from === to) return amount;
   const usdAmount = amount / CURRENCIES[from].rate;
   return usdAmount * CURRENCIES[to].rate;
+}
+
+// Resolve the currency a transaction is actually denominated in.
+// A transaction may be recorded in a currency other than its wallet's (e.g. a
+// USD hotel bill paid from a JPY account), so tx.currency always wins when set.
+// EVERY analytics/aggregation path must go through this helper — reading
+// wallet.currency directly silently mis-converts foreign-currency transactions
+// (a USD 100 expense on a JPY wallet was counted as JPY 100, a 156x
+// understatement, while the ledger row and wallet balance showed it correctly).
+function getTxCurrency(tx, fallbackCurrency) {
+  if (tx && tx.currency) return tx.currency;
+  const wallet = tx ? MidoriState.wallets.find(w => w.id === tx.walletId) : null;
+  return wallet ? wallet.currency : fallbackCurrency;
 }
 
 // Format amount nicely with symbols
@@ -72,14 +134,75 @@ function formatCurrency(amount, currencyCode) {
   });
 }
 
+// Escape a value for safe interpolation into an HTML template string.
+//
+// Every renderer builds markup with template literals + insertAdjacentHTML, so
+// any field that originates from user input, an imported backup, or a cloud
+// pull MUST pass through here. Without it, a transaction titled
+// `<img src=x onerror=...>` executes on render with full access to the ledger
+// and the sync key in localStorage.
+//
+// Escaping both quote styles makes this safe inside quoted attribute values
+// (e.g. style="color: ${escapeHtml(color)}") as well as in element text.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Deep copy helpers
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-// Generate secure simple IDs
+const TOKEN_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+// Cryptographically secure random token.
+// Uses rejection sampling (discarding bytes >= 248) so every character in
+// TOKEN_ALPHABET is equally likely — a plain `byte % 62` would over-represent
+// the first 8 characters and shrink the effective key space.
+// Note: crypto.getRandomValues is available in insecure contexts too (unlike
+// crypto.subtle), so this works under file:// in the Android wrapper.
+function randomToken(length) {
+  const cryptoObj = globalThis.crypto;
+  if (!cryptoObj || typeof cryptoObj.getRandomValues !== 'function') {
+    throw new Error('A secure random source (crypto.getRandomValues) is unavailable in this browser.');
+  }
+  const limit = 256 - (256 % TOKEN_ALPHABET.length); // 248 for a 62-char alphabet
+  const buffer = new Uint8Array(length * 2);
+  let out = '';
+  while (out.length < length) {
+    cryptoObj.getRandomValues(buffer);
+    for (let i = 0; i < buffer.length && out.length < length; i++) {
+      if (buffer[i] < limit) out += TOKEN_ALPHABET.charAt(buffer[i] % TOKEN_ALPHABET.length);
+    }
+  }
+  return out;
+}
+
+// Generate collision-resistant record IDs.
+// Previously Math.random().toString(36).substr(2, 9) — only ~46 bits from a
+// non-cryptographic PRNG, which risked collisions across synced devices.
 function generateUUID() {
-  return 'midori_' + Math.random().toString(36).substr(2, 9);
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
+    return 'midori_' + cryptoObj.randomUUID().replace(/-/g, '');
+  }
+  return 'midori_' + randomToken(32);
+}
+
+// Form input validators (shared by all add/edit form handlers in app.js)
+function validateAmount(value) {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0;
+}
+
+function validateRequiredText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 // Clean up any orphaned future transactions (from deleted schedules)
@@ -153,7 +276,10 @@ function loadState() {
       if (!MidoriState.updatedAt) {
         MidoriState.updatedAt = Date.now();
       }
-      
+      if (MidoriState.fxRatesCache === undefined) {
+        MidoriState.fxRatesCache = null;
+      }
+
       // Clean up legacy orphaned future transactions
       cleanupOrphanedFutureTransactions();
     } catch (e) {
@@ -168,10 +294,18 @@ function loadState() {
 // Save state to local storage
 function saveState() {
   MidoriState.updatedAt = Date.now();
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+  } catch (e) {
+    console.error('Failed to persist Midori state to localStorage.', e);
+    window.dispatchEvent(new CustomEvent('midoriStorageQuotaExceeded'));
+    // Still notify UI to reflect in-memory state, but skip cloud sync of unsaved data
+    window.dispatchEvent(new CustomEvent('midoriStateChanged'));
+    return;
+  }
   // Dispatch custom event to trigger UI updates
   window.dispatchEvent(new CustomEvent('midoriStateChanged'));
-  
+
   // Trigger background auto sync push if enabled
   triggerAutoSyncPush();
 }
@@ -565,8 +699,23 @@ function updateWallet(walletId, updatedFields) {
 
 function deleteWallet(walletId) {
   MidoriState.wallets = MidoriState.wallets.filter(w => w.id !== walletId);
-  MidoriState.transactions = MidoriState.transactions.filter(t => t.walletId !== walletId);
-  saveState();
+
+  // Drop transactions on BOTH sides of the wallet. Filtering only on walletId
+  // left transfers whose toWalletId pointed at the deleted wallet: the source
+  // was still debited but nothing was credited, so the transferred amount
+  // silently vanished from net worth.
+  MidoriState.transactions = MidoriState.transactions.filter(
+    t => t.walletId !== walletId && t.toWalletId !== walletId
+  );
+
+  // Schedules pointing at a deleted wallet would keep generating transactions
+  // into an account that no longer exists.
+  MidoriState.schedules = MidoriState.schedules.filter(s => s.walletId !== walletId);
+
+  // Every other mutator recalculates; this one did not, so the remaining
+  // wallets kept balances that included the now-deleted transactions until
+  // some unrelated later action happened to trigger a recalculation.
+  recalculateWalletBalances();
 }
 
 // Categories/Tags
@@ -598,6 +747,21 @@ function updateCategory(categoryId, updatedFields) {
 
 function deleteCategory(categoryId) {
   MidoriState.categories = MidoriState.categories.filter(c => c.id !== categoryId);
+
+  // Clear dangling references rather than leaving ids that resolve to nothing.
+  // Transaction history is preserved (it just becomes uncategorised), but
+  // schedules are deactivated because they would otherwise keep minting new
+  // transactions against a category the user deliberately removed.
+  MidoriState.transactions.forEach(tx => {
+    if (tx.categoryId === categoryId) tx.categoryId = null;
+  });
+  MidoriState.schedules.forEach(schedule => {
+    if (schedule.categoryId === categoryId) {
+      schedule.categoryId = null;
+      schedule.active = false;
+    }
+  });
+
   saveState();
 }
 
@@ -665,17 +829,46 @@ function exportStateJSON() {
   return JSON.stringify(MidoriState, null, 2);
 }
 
+// Validate the shape of a parsed backup before accepting it, so a malformed
+// or hand-edited JSON file can't silently corrupt MidoriState.
+function isValidStateShape(parsed) {
+  if (!parsed || typeof parsed !== 'object') return false;
+
+  const arrayFields = ['wallets', 'categories', 'transactions', 'schedules'];
+  for (const field of arrayFields) {
+    if (!Array.isArray(parsed[field])) return false;
+  }
+
+  const hasRequiredFields = (item, fields) =>
+    item && typeof item === 'object' && fields.every(f => item[f] !== undefined && item[f] !== null);
+
+  const walletsValid = parsed.wallets.every(w => hasRequiredFields(w, ['id', 'name', 'currency']));
+  const categoriesValid = parsed.categories.every(c => hasRequiredFields(c, ['id', 'name', 'type']));
+  const transactionsValid = parsed.transactions.every(t => hasRequiredFields(t, ['id', 'title', 'amount', 'type', 'walletId', 'date']));
+  // A schedule's frequency must be one the recurrence engine can actually
+  // advance. Checking only that the field EXISTS let a hand-edited or corrupted
+  // backup through with e.g. "fortnightly", which made every occurrence loop
+  // spin forever and exhaust memory on the next date change.
+  const schedulesValid = parsed.schedules.every(s =>
+    hasRequiredFields(s, ['id', 'title', 'amount', 'type', 'walletId', 'frequency', 'startDate', 'nextDueDate']) &&
+    (typeof isValidFrequency !== 'function' || isValidFrequency(s.frequency))
+  );
+
+  return walletsValid && categoriesValid && transactionsValid && schedulesValid;
+}
+
 // Import Entire State
 function importStateJSON(jsonString) {
   try {
     const parsed = JSON.parse(jsonString);
-    if (parsed.wallets && parsed.categories && parsed.transactions && parsed.schedules) {
+    if (isValidStateShape(parsed)) {
       MidoriState = parsed;
       saveState();
       cleanupOrphanedFutureTransactions();
       recalculateWalletBalances();
       return true;
     }
+    console.error('Import failed: backup file does not match the expected state shape.');
   } catch (e) {
     console.error('Import failed', e);
   }
@@ -683,10 +876,45 @@ function importStateJSON(jsonString) {
 }
 
 // Web Crypto AES-GCM Encrypted Cloud Sync (ZenSync) Engine
-async function deriveKey(syncKeyStr) {
+
+// OWASP-recommended floor for PBKDF2-HMAC-SHA256 (2023 guidance).
+const PBKDF2_ITERATIONS = 310000;
+const PAYLOAD_VERSION = 'v2';
+
+// Stretch the sync key into an AES-GCM key.
+// The salt is the syncId: it is unique per ledger and identical on every paired
+// device, so both sides derive the same key without transporting extra state.
+// A salt is public by design — its job is to stop precomputed/rainbow attacks
+// being shared across users, not to be secret.
+async function deriveKey(syncKeyStr, saltStr) {
   const encoder = new TextEncoder();
-  const rawKey = encoder.encode(syncKeyStr);
-  const hash = await window.crypto.subtle.digest('SHA-256', rawKey);
+  const baseKey = await window.crypto.subtle.importKey(
+    'raw',
+    encoder.encode(syncKeyStr),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+  return await window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode(String(saltStr || 'midori_default_salt')),
+      iterations: PBKDF2_ITERATIONS,
+      hash: 'SHA-256'
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+// Pre-v2 derivation: a single unsalted SHA-256 pass. Retained ONLY so ledgers
+// synced before the PBKDF2 upgrade can still be read; such payloads are
+// transparently re-encrypted at v2 on the next push. Never used to encrypt.
+async function deriveLegacyKey(syncKeyStr) {
+  const encoder = new TextEncoder();
+  const hash = await window.crypto.subtle.digest('SHA-256', encoder.encode(syncKeyStr));
   return await window.crypto.subtle.importKey(
     'raw',
     hash,
@@ -696,75 +924,84 @@ async function deriveKey(syncKeyStr) {
   );
 }
 
-async function encryptData(plaintextStr, syncKeyStr) {
-  const encoder = new TextEncoder();
-  const rawPlaintext = encoder.encode(plaintextStr);
-  const aesKey = await deriveKey(syncKeyStr);
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  
-  const ciphertextBuffer = await window.crypto.subtle.encrypt(
-    {
-      name: 'AES-GCM',
-      iv: iv
-    },
-    aesKey,
-    rawPlaintext
-  );
-  
-  const ivBase64 = btoa(String.fromCharCode(...iv));
-  const ciphertextBytes = new Uint8Array(ciphertextBuffer);
-  const ciphertextBase64 = btoa(String.fromCharCode(...ciphertextBytes));
-  return `${ivBase64}:${ciphertextBase64}`;
+function bytesToBase64(bytes) {
+  let binary = '';
+  // Chunked to avoid blowing the argument limit on large ledgers, which
+  // String.fromCharCode(...bytes) would do with a RangeError.
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
 }
 
-async function decryptData(encryptedPayload, syncKeyStr) {
-  const parts = encryptedPayload.split(':');
-  if (parts.length !== 2) {
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function encryptData(plaintextStr, syncKeyStr, saltStr) {
+  const encoder = new TextEncoder();
+  const aesKey = await deriveKey(syncKeyStr, saltStr);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+  const ciphertextBuffer = await window.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv },
+    aesKey,
+    encoder.encode(plaintextStr)
+  );
+
+  return `${PAYLOAD_VERSION}:${bytesToBase64(iv)}:${bytesToBase64(new Uint8Array(ciphertextBuffer))}`;
+}
+
+async function decryptData(encryptedPayload, syncKeyStr, saltStr) {
+  const parts = String(encryptedPayload).split(':');
+
+  let ivBase64;
+  let ciphertextBase64;
+  let aesKey;
+
+  if (parts.length === 3 && parts[0] === PAYLOAD_VERSION) {
+    ivBase64 = parts[1];
+    ciphertextBase64 = parts[2];
+    aesKey = await deriveKey(syncKeyStr, saltStr);
+  } else if (parts.length === 2) {
+    // Legacy unversioned payload written before the PBKDF2 upgrade.
+    ivBase64 = parts[0];
+    ciphertextBase64 = parts[1];
+    aesKey = await deriveLegacyKey(syncKeyStr);
+  } else {
     throw new Error('Invalid encrypted payload format.');
   }
-  
-  const ivBase64 = parts[0];
-  const ciphertextBase64 = parts[1];
-  
-  const ivBytes = new Uint8Array(atob(ivBase64).split('').map(c => c.charCodeAt(0)));
-  const ciphertextBytes = new Uint8Array(atob(ciphertextBase64).split('').map(c => c.charCodeAt(0)));
-  
-  const aesKey = await deriveKey(syncKeyStr);
-  
+
   const decryptedBuffer = await window.crypto.subtle.decrypt(
-    {
-      name: 'AES-GCM',
-      iv: ivBytes
-    },
+    { name: 'AES-GCM', iv: base64ToBytes(ivBase64) },
     aesKey,
-    ciphertextBytes
+    base64ToBytes(ciphertextBase64)
   );
-  
-  const decoder = new TextDecoder();
-  return decoder.decode(decryptedBuffer);
+
+  return new TextDecoder().decode(decryptedBuffer);
 }
 
 function generateSecureSyncId() {
-  if (typeof window.crypto.randomUUID === 'function') {
-    return 'mds_' + window.crypto.randomUUID().replace(/-/g, '');
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
+    return 'mds_' + cryptoObj.randomUUID().replace(/-/g, '');
   }
-  // Fallback
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let randStr = '';
-  for (let i = 0; i < 24; i++) {
-    randStr += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return 'mds_' + randStr;
+  return 'mds_' + randomToken(24);
 }
 
+// The sync key is the sole input to the AES-GCM key, so it MUST come from a
+// CSPRNG. This previously used Math.random(), whose internal state is
+// recoverable from observed output — meaning the "24 random characters" offered
+// far less entropy than it appeared to, and every ZenSync payload was at risk.
 function generateSyncCredentials() {
-  const syncId = generateSecureSyncId();
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let syncKey = 'msk_';
-  for (let i = 0; i < 24; i++) {
-    syncKey += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return { syncId, syncKey };
+  return {
+    syncId: generateSecureSyncId(),
+    syncKey: 'msk_' + randomToken(32)
+  };
 }
 
 let syncDebounceTimeout = null;
@@ -795,7 +1032,7 @@ async function pushStateToCloud() {
   
   try {
     const plaintext = JSON.stringify(MidoriState);
-    const encrypted = await encryptData(plaintext, syncKey);
+    const encrypted = await encryptData(plaintext, syncKey, syncId);
     const cloudEnvelope = {
       encryptedData: encrypted,
       updatedAt: MidoriState.updatedAt || Date.now()
@@ -857,7 +1094,7 @@ async function pullStateFromCloud() {
       throw new Error('Invalid cloud response envelope.');
     }
     
-    const decryptedJson = await decryptData(cloudEnvelope.encryptedData, syncKey);
+    const decryptedJson = await decryptData(cloudEnvelope.encryptedData, syncKey, syncId);
     const parsedState = JSON.parse(decryptedJson);
     
     const localUpdatedAt = MidoriState.updatedAt || 0;

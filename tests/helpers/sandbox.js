@@ -36,14 +36,25 @@ function createSandbox() {
     CustomEvent,
   };
 
+  // state.js draws record IDs and sync credentials from crypto.getRandomValues /
+  // crypto.randomUUID (never Math.random), so the sandbox must expose the same
+  // WebCrypto surface the browser does. Node's global webcrypto is API-identical.
+  windowStub.crypto = globalThis.crypto;
+
   const sandbox = {
     console,
     localStorage,
     window: windowStub,
+    crypto: globalThis.crypto,
     CustomEvent,
     setTimeout,
     clearTimeout,
     fetch: () => Promise.reject(new Error('fetch is not available in the test sandbox')),
+    TextEncoder,
+    TextDecoder,
+    Uint8Array,
+    btoa,
+    atob,
   };
   sandbox.globalThis = sandbox;
 

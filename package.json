@@ -4,7 +4,7 @@
   "private": true,
   "description": "Dev-time test runner for Midori. The deployed app itself remains a build-step-free static site (plain <script> tags).",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test \"tests/**/*.test.js\"",
     "sync-android": "powershell -ExecutionPolicy Bypass -File sync_android_assets.ps1"
   }
 }

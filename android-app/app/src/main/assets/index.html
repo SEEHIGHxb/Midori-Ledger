@@ -4,6 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Midori — Leafy Ledger</title>
+
+  <!-- Content-Security-Policy.
+       script-src deliberately omits 'unsafe-inline': every handler is now
+       delegated via [data-action] and no inline <script> remains, so an
+       injected <script> or onclick= cannot execute even if a rendering path
+       were to miss escapeHtml().
+       'unsafe-inline' IS still required for style-src because the markup and
+       renderers rely heavily on style="..." attributes.
+       The file: source keeps the Android WebView wrapper working, which loads
+       this page from file:///android_asset/ (an opaque origin 'self' misses).
+       connect-src is limited to the FX rates API and the ZenSync bucket. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self' file:;
+    script-src 'self' file:;
+    style-src 'self' file: 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' file: data: https://fonts.gstatic.com;
+    img-src 'self' file: data: blob:;
+    connect-src 'self' file: https://open.er-api.com https://kvdb.io;
+    media-src 'self' file: blob:;
+    object-src 'none';
+    base-uri 'none';
+    form-action 'none';
+  ">
   <link rel="icon" type="image/png" href="image/midori.png">
   <link rel="shortcut icon" type="image/png" href="image/midori.png">
   
@@ -22,8 +45,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
-  <!-- Chart.js for High-Fidelity Interactive Visualizations -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js for High-Fidelity Interactive Visualizations.
+       Vendored (pinned v4.5.1, MIT) rather than loaded from a CDN: an unpinned
+       CDN tag would let a compromised package run arbitrary code against the
+       ledger and sync key, and cross-origin scripts are not cached by sw.js,
+       so charts silently failed to render offline. -->
+  <script src="js/chart.umd.min.js"></script>
 </head>
 <body class="theme-dark">
 
@@ -119,7 +146,7 @@
         </div>
         <div class="header-controls">
           <!-- ZenSync Status Icon -->
-          <div class="sync-status-widget" id="zensync-header-status" style="display: none; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 20px; font-size: 11px; cursor: pointer; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);" onclick="activeTab='settings'; setupNavigation(); showTab('tab-settings');" title="ZenSync Active. Click to view settings.">
+          <div class="sync-status-widget" id="zensync-header-status" style="display: none; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 20px; font-size: 11px; cursor: pointer; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);" data-action="goToSettingsTab" title="ZenSync Active. Click to view settings.">
             <span class="sync-icon-pulse" id="zensync-header-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green-mint);"></span>
             <span id="zensync-header-text" style="font-weight: 600; opacity: 0.8;">Synced</span>
           </div>
@@ -131,11 +158,11 @@
               <span id="virtualDateDisplay">20 May 2026</span>
               <input type="date" id="headerDatePicker" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0;">
             </span>
-            <button class="time-travel-btn" id="timeTravelBtnPrevYear" onclick="triggerYearTravel(-1)">-1 Year</button>
-            <button class="time-travel-btn" id="timeTravelBtnPrevMonth" onclick="triggerMonthTravel(-1)">-1 Month</button>
-            <button class="time-travel-btn current-date-btn" id="timeTravelBtnCurrent" onclick="resetToCurrentDate()">Current Date</button>
-            <button class="time-travel-btn" id="timeTravelBtnNextMonth" onclick="triggerMonthTravel(1)">+1 Month</button>
-            <button class="time-travel-btn" id="timeTravelBtnNextYear" onclick="triggerYearTravel(1)">+1 Year</button>
+            <button class="time-travel-btn" id="timeTravelBtnPrevYear" data-action="triggerYearTravel" data-arg="-1">-1 Year</button>
+            <button class="time-travel-btn" id="timeTravelBtnPrevMonth" data-action="triggerMonthTravel" data-arg="-1">-1 Month</button>
+            <button class="time-travel-btn current-date-btn" id="timeTravelBtnCurrent" data-action="resetToCurrentDate">Current Date</button>
+            <button class="time-travel-btn" id="timeTravelBtnNextMonth" data-action="triggerMonthTravel" data-arg="1">+1 Month</button>
+            <button class="time-travel-btn" id="timeTravelBtnNextYear" data-action="triggerYearTravel" data-arg="1">+1 Year</button>
           </div>
 
           <!-- Base Currency Selector -->
@@ -148,6 +175,7 @@
               <option value="CNY">CNY (¥)</option>
               <option value="JPY">JPY (¥)</option>
             </select>
+            <small id="fxRatesUpdatedLabel" class="fx-rates-label"></small>
           </div>
         </div>
       </header>
@@ -232,7 +260,7 @@
         </div>
 
         <!-- Quick actions / Recent Transactions row -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <div class="dashboard-bottom-section">
           <!-- Active budgets warnings -->
           <div class="chart-card">
             <h3 style="margin-bottom:12px;">Active Budget Alerts</h3>
@@ -257,7 +285,7 @@
       <div id="tab-wallets" class="tab-content">
         <div class="section-header">
           <h2>Wallets Management</h2>
-          <button class="add-btn" onclick="openModal('modalWallet')">
+          <button class="add-btn" data-action="openModal" data-arg="modalWallet">
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Add New Wallet
           </button>
@@ -292,7 +320,7 @@
       <div id="tab-tags" class="tab-content">
         <div class="section-header">
           <h2>Category Tags</h2>
-          <button class="add-btn" onclick="openModal('modalCategory')">
+          <button class="add-btn" data-action="openModal" data-arg="modalCategory">
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Create New Tag
           </button>
@@ -309,7 +337,7 @@
       <div id="tab-ledger" class="tab-content">
         <div class="section-header">
           <h2>Transactions History</h2>
-          <button class="add-btn" onclick="openModal('modalTransaction')">
+          <button class="add-btn" data-action="openModal" data-arg="modalTransaction">
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Add Transaction
           </button>
@@ -375,7 +403,7 @@
       <div id="tab-schedules" class="tab-content">
         <div class="section-header">
           <h2>Recurrence Schedules</h2>
-          <button class="add-btn" onclick="openModal('modalSchedule')">
+          <button class="add-btn" data-action="openModal" data-arg="modalSchedule">
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Add Recurring Schedule
           </button>
@@ -446,8 +474,8 @@
           <div id="zensync-disabled-view">
             <p style="font-size: 13px; opacity: 0.8; margin-bottom: 16px;">Cloud synchronization is currently <b>Disabled</b>. You can enable it to back up your ledger or pair with another device.</p>
             <div class="settings-action-row">
-              <button class="add-btn" onclick="enableZenSync()">Enable Cloud Sync</button>
-              <button class="btn-secondary" onclick="openPairingModal()">Link Existing Device</button>
+              <button class="add-btn" data-action="enableZenSync">Enable Cloud Sync</button>
+              <button class="btn-secondary" data-action="openPairingModal">Link Existing Device</button>
             </div>
           </div>
 
@@ -461,15 +489,15 @@
                 <label style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Sync ID (Public Address)</label>
                 <div style="display: flex; gap: 8px;">
                   <input type="text" id="sync-id-display" class="form-control" style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.2);" readonly>
-                  <button class="btn-secondary" style="padding: 0 12px;" onclick="copySyncField('sync-id-display')">Copy</button>
+                  <button class="btn-secondary" style="padding: 0 12px;" data-action="copySyncField" data-arg="sync-id-display">Copy</button>
                 </div>
               </div>
               <div style="margin-bottom: 12px;">
                 <label style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Private Sync Key (Keep Secret!)</label>
                 <div style="display: flex; gap: 8px;">
                   <input type="password" id="sync-key-display" class="form-control" style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.2);" readonly>
-                  <button class="btn-secondary" style="padding: 0 12px;" id="btn-toggle-sync-key-visibility" onclick="toggleSyncKeyVisibility()">Show</button>
-                  <button class="btn-secondary" style="padding: 0 12px;" onclick="copySyncField('sync-key-display')">Copy</button>
+                  <button class="btn-secondary" style="padding: 0 12px;" id="btn-toggle-sync-key-visibility" data-action="toggleSyncKeyVisibility">Show</button>
+                  <button class="btn-secondary" style="padding: 0 12px;" data-action="copySyncField" data-arg="sync-key-display">Copy</button>
                 </div>
               </div>
               
@@ -484,9 +512,9 @@
             </div>
 
             <div class="settings-action-row" style="flex-wrap: wrap; gap: 8px;">
-              <button class="btn-secondary" onclick="forceSyncPush()">Export Data to Cloud</button>
-              <button class="btn-secondary" onclick="forceSyncPull()">Import Data From Cloud</button>
-              <button class="btn-danger" style="margin-left: auto;" onclick="disableZenSync()">Disable Cloud Sync</button>
+              <button class="btn-secondary" data-action="forceSyncPush">Export Data to Cloud</button>
+              <button class="btn-secondary" data-action="forceSyncPull">Import Data From Cloud</button>
+              <button class="btn-danger" style="margin-left: auto;" data-action="disableZenSync">Disable Cloud Sync</button>
             </div>
           </div>
         </div>
@@ -495,8 +523,8 @@
           <h3>Data Portability</h3>
           <p>Export your entire ledger configuration and transaction history to a localized JSON file or import a saved backup state.</p>
           <div class="settings-action-row">
-            <button class="btn-secondary" onclick="triggerStateExport()">Export Backup JSON</button>
-            <button class="btn-secondary" onclick="document.getElementById('importFileInput').click()">Import Backup JSON</button>
+            <button class="btn-secondary" data-action="triggerStateExport">Export Backup JSON</button>
+            <button class="btn-secondary" data-action="clickImportFileInput">Import Backup JSON</button>
             <input type="file" id="importFileInput" style="display:none;" accept=".json" onchange="triggerStateImport(event)">
           </div>
         </div>
@@ -505,7 +533,7 @@
           <h3>Erase Database</h3>
           <p style="color:var(--autumn-terracotta);">Warning: This action will completely erase all wallets, transactions, tags, budgets, and histories saved in LocalStorage and reset the database to a completely empty clean slate.</p>
           <div class="settings-action-row">
-            <button class="btn-danger" onclick="triggerStateReset()">Reset to Blank Slate</button>
+            <button class="btn-danger" data-action="triggerStateReset">Reset to Blank Slate</button>
           </div>
         </div>
 
@@ -514,8 +542,8 @@
           <p>System update and release integrity verification.</p>
           <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; font-size: 13px; line-height: 1.6; display: flex; flex-direction: column; gap: 8px;">
             <div><strong>App Name:</strong> Midori — Leafy Ledger</div>
-            <div><strong>Version:</strong> 1.3.0 (Build 2026.05.29-v11)</div>
-            <div><strong>Last Updated:</strong> May 29, 2026</div>
+            <div><strong>Version:</strong> 1.3.1 (Build 2026.06.24-v12)</div>
+            <div><strong>Last Updated:</strong> June 24, 2026</div>
             <div><strong>Sync Engine:</strong> ZenSync Local AES-GCM-256 (PWA-v11)</div>
           </div>
         </div>
@@ -530,7 +558,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Add Transaction</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalTransaction')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalTransaction">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -617,7 +645,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Create Wallet Card</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalWallet')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalWallet">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -685,7 +713,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Edit Wallet Card</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalEditWallet')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalEditWallet">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -754,7 +782,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Create Tag & Monthly Budget</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalCategory')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalCategory">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -825,7 +853,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Create Recurring Schedule</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalSchedule')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalSchedule">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -898,7 +926,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Edit Tag & Monthly Budget</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalEditCategory')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalEditCategory">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -970,7 +998,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Edit Transaction</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalEditTransaction')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalEditTransaction">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -1058,7 +1086,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Edit Recurring Schedule</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalEditSchedule')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalEditSchedule">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -1133,7 +1161,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <h3>Edit Category Budget Limits</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalEditBudget')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalEditBudget">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -1167,7 +1195,7 @@
     <div class="modal-window" style="max-width: 450px;">
       <div class="modal-header">
         <h3>Link Existing Device</h3>
-        <button class="modal-close-btn" onclick="closeModal('modalPairing')">
+        <button class="modal-close-btn" data-action="closeModal" data-arg="modalPairing">
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
@@ -1186,7 +1214,7 @@
         <!-- Method B: Camera scan button -->
         <div class="input-group" style="display: flex; flex-direction: column; align-items: center; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
           <span style="font-size: 12px; margin-bottom: 8px;">Or scan the Pairing QR Code from your other device:</span>
-          <button type="button" class="btn-secondary" id="btn-scan-qr" onclick="startQRScanner()" style="display: flex; align-items: center; gap: 8px;">
+          <button type="button" class="btn-secondary" id="btn-scan-qr" data-action="startQRScanner" style="display: flex; align-items: center; gap: 8px;">
             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
             Scan Pairing QR Code
           </button>
@@ -1197,7 +1225,7 @@
             <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 40px solid rgba(0,0,0,0.5); pointer-events: none; display: flex; align-items: center; justify-content: center;">
               <div style="width: 100%; height: 100%; border: 2px dashed var(--green-mint);"></div>
             </div>
-            <button type="button" class="btn-danger" style="position: absolute; bottom: 8px; right: 8px; padding: 4px 8px; font-size: 10px;" onclick="stopQRScanner()">Cancel Scan</button>
+            <button type="button" class="btn-danger" style="position: absolute; bottom: 8px; right: 8px; padding: 4px 8px; font-size: 10px;" data-action="stopQRScanner">Cancel Scan</button>
           </div>
         </div>
 
@@ -1214,41 +1242,17 @@
   <script src="js/state.js"></script>
   <script src="js/scheduler.js"></script>
   <script src="js/charts.js"></script>
-  <script src="js/app.js"></script>
-  
-  <!-- PWA Service Worker Registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((reg) => {
-            console.log('Midori Service Worker registered successfully:', reg.scope);
-            
-            // Check for updates periodically or on page load
-            reg.onupdatefound = () => {
-              const installingWorker = reg.installing;
-              installingWorker.onstatechange = () => {
-                if (installingWorker.state === 'installed') {
-                  if (navigator.serviceWorker.controller) {
-                    console.log('New Midori version detected. Upgrading in background...');
-                  }
-                }
-              };
-            };
-          })
-          .catch((err) => console.error('Midori Service Worker registration failed:', err));
-      });
 
-      // Automatically reload the page when a new service worker takes over control
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          console.log('New Service Worker active. Reloading page to apply updates...');
-          window.location.reload();
-        }
-      });
-    }
-  </script>
+  <!-- UI Controllers (split from former monolithic app.js) -->
+  <script src="js/dashboard.js"></script>
+  <script src="js/wallets.js"></script>
+  <script src="js/categories-budgets.js"></script>
+  <script src="js/transactions.js"></script>
+  <script src="js/schedules.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/ui-core.js"></script>
+  
+  <!-- PWA Service Worker Registration (external so script-src can stay strict) -->
+  <script src="js/sw-register.js"></script>
 </body>
 </html>

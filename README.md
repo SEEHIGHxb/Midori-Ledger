@@ -25,7 +25,7 @@ Because Midori is a static SPA, you can host it **100% free** on **GitHub Pages*
 4. Set the repository to **Public** and do not add a README, `.gitignore`, or license. Click **Create repository**.
 
 ### Step 2: Push Your Code to GitHub
-Open your terminal inside this project directory (`C:\Users\passa\.gemini\antigravity\scratch\finance-ledger-app`) and run the following commands:
+Open your terminal inside this project directory and run the following commands:
 ```bash
 # Initialize a local git repository
 git init
@@ -82,9 +82,23 @@ Once your site is live on GitHub Pages (or hosted locally):
 
 Midori ships as plain `<script>`-tag JavaScript with no build step or bundler — `index.html` must keep working when opened directly via `file://`, since the Android wrapper app loads it that way.
 
+### Third-party libraries are vendored, not CDN-loaded
+
+`js/chart.umd.min.js` (Chart.js v4.5.1, MIT), `js/qrcode.min.js` and `js/jsqr.min.js` are committed to the repo on purpose. Loading them from a CDN would put a finance app's ledger and sync key at the mercy of a third-party script tag, and `sw.js` only caches same-origin requests — so a CDN-hosted Chart.js left the dashboard blank whenever the device was offline. **Do not swap these back to CDN `<script>` tags.** To upgrade, download the pinned build and re-run `npm run sync-android`.
+
+### Content-Security-Policy
+
+`index.html` sets a CSP that omits `'unsafe-inline'` from `script-src`. That means **no inline `<script>` blocks and no `onclick=` attributes** — anywhere, including in markup built by the renderers. Row-level actions go through the `[data-action]` / `data-arg` delegation table in `js/ui-core.js`; add new actions there rather than reaching for an inline handler. Any value interpolated into an HTML template string must be wrapped in `escapeHtml()` (defined in `js/state.js`).
+
 ### Running the test suite
 
-A small `node --test` suite covers the riskiest pure logic (currency conversion, input validators, orphaned-transaction cleanup, and recurring-schedule date advancement) by loading the real `js/state.js`/`js/scheduler.js` source files into a headless Node `vm` sandbox — no DOM, no new runtime dependency.
+A `node --test` suite covers the riskiest pure logic by loading the real `js/state.js`/`js/scheduler.js` source files into a headless Node `vm` sandbox — no DOM, no new runtime dependency. It covers:
+
+- currency conversion, and **transaction-currency resolution** (`getTxCurrency`) — a transaction may be denominated in a currency other than its wallet's, and every analytic must agree with the balance engine on which one applies;
+- input validators and backup-shape validation, including rejecting recurrence frequencies the scheduler cannot advance;
+- recurring-schedule date advancement, plus the guards that stop an unadvanceable schedule from looping forever;
+- deletion cascades (wallet/category) and wallet-balance recalculation;
+- the ZenSync crypto layer — AES-GCM round-trip, PBKDF2 salt binding, CSPRNG credential generation, and backward compatibility with pre-upgrade payloads.
 
 ```bash
 npm test

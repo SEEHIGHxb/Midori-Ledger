@@ -4,6 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Midori — Leafy Ledger</title>
+
+  <!-- Content-Security-Policy.
+       script-src deliberately omits 'unsafe-inline': every handler is now
+       delegated via [data-action] and no inline <script> remains, so an
+       injected <script> or onclick= cannot execute even if a rendering path
+       were to miss escapeHtml().
+       'unsafe-inline' IS still required for style-src because the markup and
+       renderers rely heavily on style="..." attributes.
+       The file: source keeps the Android WebView wrapper working, which loads
+       this page from file:///android_asset/ (an opaque origin 'self' misses).
+       connect-src is limited to the FX rates API and the ZenSync bucket. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self' file:;
+    script-src 'self' file:;
+    style-src 'self' file: 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' file: data: https://fonts.gstatic.com;
+    img-src 'self' file: data: blob:;
+    connect-src 'self' file: https://open.er-api.com https://kvdb.io;
+    media-src 'self' file: blob:;
+    object-src 'none';
+    base-uri 'none';
+    form-action 'none';
+  ">
   <link rel="icon" type="image/png" href="image/midori.png">
   <link rel="shortcut icon" type="image/png" href="image/midori.png">
   
@@ -22,8 +45,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
-  <!-- Chart.js for High-Fidelity Interactive Visualizations -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js for High-Fidelity Interactive Visualizations.
+       Vendored (pinned v4.5.1, MIT) rather than loaded from a CDN: an unpinned
+       CDN tag would let a compromised package run arbitrary code against the
+       ledger and sync key, and cross-origin scripts are not cached by sw.js,
+       so charts silently failed to render offline. -->
+  <script src="js/chart.umd.min.js"></script>
 </head>
 <body class="theme-dark">
 
@@ -1225,39 +1252,7 @@
   <script src="js/sync.js"></script>
   <script src="js/ui-core.js"></script>
   
-  <!-- PWA Service Worker Registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((reg) => {
-            console.log('Midori Service Worker registered successfully:', reg.scope);
-            
-            // Check for updates periodically or on page load
-            reg.onupdatefound = () => {
-              const installingWorker = reg.installing;
-              installingWorker.onstatechange = () => {
-                if (installingWorker.state === 'installed') {
-                  if (navigator.serviceWorker.controller) {
-                    console.log('New Midori version detected. Upgrading in background...');
-                  }
-                }
-              };
-            };
-          })
-          .catch((err) => console.error('Midori Service Worker registration failed:', err));
-      });
-
-      // Automatically reload the page when a new service worker takes over control
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          console.log('New Service Worker active. Reloading page to apply updates...');
-          window.location.reload();
-        }
-      });
-    }
-  </script>
+  <!-- PWA Service Worker Registration (external so script-src can stay strict) -->
+  <script src="js/sw-register.js"></script>
 </body>
 </html>

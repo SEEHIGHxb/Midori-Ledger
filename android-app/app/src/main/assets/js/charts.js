@@ -77,10 +77,7 @@ function renderTrendChart(colors, baseCurrency) {
     
     const mIndex = monthInfo.findIndex(m => m.month === txMonth && m.year === txYear);
     if (mIndex !== -1) {
-      // Find transaction currency (uses custom currency if set, otherwise wallet currency)
-      const wallet = MidoriState.wallets.find(w => w.id === tx.walletId);
-      const txCurrency = tx.currency || (wallet ? wallet.currency : baseCurrency);
-      const converted = convertAmount(tx.amount, txCurrency, baseCurrency);
+      const converted = convertAmount(tx.amount, getTxCurrency(tx, baseCurrency), baseCurrency);
       
       if (tx.type === 'income') {
         incomeData[mIndex] += converted;
@@ -191,9 +188,7 @@ function renderExpenseDonut(colors, baseCurrency) {
   MidoriState.transactions.forEach(tx => {
     if (tx.scheduledId && tx.date > MidoriState.virtualDate) return;
     if (tx.type === 'expense' && categoryTotals[tx.categoryId]) {
-      const wallet = MidoriState.wallets.find(w => w.id === tx.walletId);
-      const txCurrency = tx.currency || (wallet ? wallet.currency : baseCurrency);
-      const converted = convertAmount(tx.amount, txCurrency, baseCurrency);
+      const converted = convertAmount(tx.amount, getTxCurrency(tx, baseCurrency), baseCurrency);
       categoryTotals[tx.categoryId].amount += converted;
     }
   });
@@ -274,9 +269,7 @@ function renderIncomeDonut(colors, baseCurrency) {
   MidoriState.transactions.forEach(tx => {
     if (tx.scheduledId && tx.date > MidoriState.virtualDate) return;
     if (tx.type === 'income' && categoryTotals[tx.categoryId]) {
-      const wallet = MidoriState.wallets.find(w => w.id === tx.walletId);
-      const txCurrency = tx.currency || (wallet ? wallet.currency : baseCurrency);
-      const converted = convertAmount(tx.amount, txCurrency, baseCurrency);
+      const converted = convertAmount(tx.amount, getTxCurrency(tx, baseCurrency), baseCurrency);
       categoryTotals[tx.categoryId].amount += converted;
     }
   });
