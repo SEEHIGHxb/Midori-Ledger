@@ -168,7 +168,7 @@
           <!-- Base Currency Selector -->
           <div class="currency-selector-widget">
             <label for="baseCurrencySelect">Base Currency</label>
-            <select id="baseCurrencySelect" class="currency-select" onchange="changeBaseCurrency(this.value)">
+            <select id="baseCurrencySelect" class="currency-select">
               <option value="THB">THB (฿)</option>
               <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
@@ -302,7 +302,7 @@
         <div class="section-header" style="flex-wrap: wrap; gap: 16px;">
           <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
             <h2 style="margin: 0;">Budgets Tracker</h2>
-            <select id="budgetPeriodSelect" class="currency-select" onchange="switchBudgetPeriod(this.value)" style="margin: 0; padding: 6px 12px; height: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--glass-bg);">
+            <select id="budgetPeriodSelect" class="currency-select" style="margin: 0; padding: 6px 12px; height: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--glass-bg);">
               <option value="monthly">Monthly Limit View</option>
               <option value="yearly">Yearly Limit View</option>
             </select>
@@ -347,25 +347,25 @@
         <div class="ledger-filter-bar">
           <div class="input-group">
             <label for="filterSearch">Search Description</label>
-            <input type="text" id="filterSearch" class="form-control" placeholder="Search noodles, rent..." oninput="renderLedger()">
+            <input type="text" id="filterSearch" class="form-control" placeholder="Search noodles, rent...">
           </div>
           <div class="input-group">
             <label for="filterWallet">Wallet</label>
-            <select id="filterWallet" class="form-control" onchange="renderLedger()">
+            <select id="filterWallet" class="form-control">
               <option value="all">All Wallets</option>
               <!-- Populated dynamically -->
             </select>
           </div>
           <div class="input-group">
             <label for="filterTag">Category Tag</label>
-            <select id="filterTag" class="form-control" onchange="renderLedger()">
+            <select id="filterTag" class="form-control">
               <option value="all">All Categories</option>
               <!-- Populated dynamically -->
             </select>
           </div>
           <div class="input-group">
             <label for="filterType">Type</label>
-            <select id="filterType" class="form-control" onchange="renderLedger()">
+            <select id="filterType" class="form-control">
               <option value="all">Income & Expense</option>
               <option value="income">Income Only</option>
               <option value="expense">Expense Only</option>
@@ -466,7 +466,7 @@
           <!-- Auto-advance date setting -->
           <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
             <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight: 500; font-size: 13px;">
-              <input type="checkbox" id="sync-auto-device-date" checked style="width:16px; height:16px; accent-color:var(--green-matcha); cursor:pointer;" onchange="toggleAutoDeviceDate(this.checked)">
+              <input type="checkbox" id="sync-auto-device-date" checked style="width:16px; height:16px; accent-color:var(--green-matcha); cursor:pointer;">
               <span>Auto-Advance virtual system date to today on application startup</span>
             </label>
           </div>
@@ -525,7 +525,7 @@
           <div class="settings-action-row">
             <button class="btn-secondary" data-action="triggerStateExport">Export Backup JSON</button>
             <button class="btn-secondary" data-action="clickImportFileInput">Import Backup JSON</button>
-            <input type="file" id="importFileInput" style="display:none;" accept=".json" onchange="triggerStateImport(event)">
+            <input type="file" id="importFileInput" style="display:none;" accept=".json">
           </div>
         </div>
 
@@ -562,7 +562,7 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="transactionForm" onsubmit="submitTransactionForm(event)">
+      <form class="modal-form" id="transactionForm">
         <!-- Row 1: Title -->
         <div class="input-group">
           <label for="txTitle">Title</label>
@@ -579,7 +579,7 @@
         <div class="form-row">
           <div class="input-group">
             <label for="txType">Type</label>
-            <select id="txType" class="form-control" onchange="handleTxTypeChange()" required>
+            <select id="txType" class="form-control" required>
               <option value="expense">Expense</option>
               <option value="income">Income</option>
               <option value="transfer">Transfer</option>
@@ -595,7 +595,7 @@
         <div class="form-row">
           <div class="input-group">
             <label for="txWallet" id="txWalletLabel">From Wallet</label>
-            <select id="txWallet" class="form-control" onchange="syncTransactionCurrencyDefault()" required>
+            <select id="txWallet" class="form-control" required>
               <!-- Loaded dynamically -->
             </select>
           </div>
@@ -649,7 +649,7 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="walletForm" onsubmit="submitWalletForm(event)">
+      <form class="modal-form" id="walletForm">
         <div class="input-group">
           <label for="walletName">Wallet Card Name</label>
           <input type="text" id="walletName" class="form-control" placeholder="E.g., Chase Bank, cash Pocket" required>
@@ -717,7 +717,7 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="editWalletForm" onsubmit="submitEditWalletForm(event)">
+      <form class="modal-form" id="editWalletForm">
         <input type="hidden" id="editWalletId">
         <div class="input-group">
           <label for="editWalletName">Wallet Card Name</label>
@@ -786,11 +786,11 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="categoryForm" onsubmit="submitCategoryForm(event)">
+      <form class="modal-form" id="categoryForm">
         <div class="form-row">
           <div class="input-group">
             <label for="catType">Classification</label>
-            <select id="catType" class="form-control" onchange="syncCategoryFormBudgetState()" required>
+            <select id="catType" class="form-control" required>
               <option value="expense">Expense Tag</option>
               <option value="income">Income Tag</option>
             </select>
@@ -857,11 +857,11 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="scheduleForm" onsubmit="submitScheduleForm(event)">
+      <form class="modal-form" id="scheduleForm">
         <div class="form-row">
           <div class="input-group">
             <label for="schedType">Type</label>
-            <select id="schedType" class="form-control" onchange="syncScheduleCategoryOptions()" required>
+            <select id="schedType" class="form-control" required>
               <option value="expense">Expense Bill</option>
               <option value="income">Income Deposit</option>
             </select>
@@ -930,12 +930,12 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="editCategoryForm" onsubmit="submitEditCategoryForm(event)">
+      <form class="modal-form" id="editCategoryForm">
         <input type="hidden" id="editCategoryId">
         <div class="form-row">
           <div class="input-group">
             <label for="editCatType">Classification</label>
-            <select id="editCatType" class="form-control" onchange="syncEditCategoryFormBudgetState()" required>
+            <select id="editCatType" class="form-control" required>
               <option value="expense">Expense Tag</option>
               <option value="income">Income Tag</option>
             </select>
@@ -1002,7 +1002,7 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="editTransactionForm" onsubmit="submitEditTransactionForm(event)">
+      <form class="modal-form" id="editTransactionForm">
         <input type="hidden" id="editTxId">
         <!-- Row 1: Title -->
         <div class="input-group">
@@ -1020,7 +1020,7 @@
         <div class="form-row">
           <div class="input-group">
             <label for="editTxType">Type</label>
-            <select id="editTxType" class="form-control" onchange="handleEditTxTypeChange()" required>
+            <select id="editTxType" class="form-control" required>
               <option value="expense">Expense</option>
               <option value="income">Income</option>
               <option value="transfer">Transfer</option>
@@ -1036,7 +1036,7 @@
         <div class="form-row">
           <div class="input-group">
             <label for="editTxWallet" id="editTxWalletLabel">From Wallet</label>
-            <select id="editTxWallet" class="form-control" onchange="syncEditTransactionCurrencyDefault()" required>
+            <select id="editTxWallet" class="form-control" required>
               <!-- Loaded dynamically -->
             </select>
           </div>
@@ -1090,12 +1090,12 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="editScheduleForm" onsubmit="submitEditScheduleForm(event)">
+      <form class="modal-form" id="editScheduleForm">
         <input type="hidden" id="editSchedId">
         <div class="form-row">
           <div class="input-group">
             <label for="editSchedType">Type</label>
-            <select id="editSchedType" class="form-control" onchange="syncEditScheduleCategoryOptions()" required>
+            <select id="editSchedType" class="form-control" required>
               <option value="expense">Expense Bill</option>
               <option value="income">Income Deposit</option>
             </select>
@@ -1165,7 +1165,7 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="editBudgetForm" onsubmit="submitEditBudgetForm(event)">
+      <form class="modal-form" id="editBudgetForm">
         <input type="hidden" id="editBudgetCategoryId">
         
         <div class="input-group">
@@ -1199,7 +1199,7 @@
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <form class="modal-form" id="pairingForm" onsubmit="submitPairingForm(event)">
+      <form class="modal-form" id="pairingForm">
         <p style="font-size: 12px; opacity: 0.8; margin-bottom: 16px; line-height: 1.5;">
           Enter the Pairing Code or credentials from your other device to synchronize your ledger. 
           <span style="color: var(--autumn-terracotta); font-weight: 600; display: block; margin-top: 4px;">Warning: This will overwrite your current local database with the synced cloud data.</span>

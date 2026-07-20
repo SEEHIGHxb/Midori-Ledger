@@ -3,7 +3,7 @@
  * sw.js: Service Worker for complete offline capabilities
  */
 
-const CACHE_NAME = 'midori-cache-v15';
+const CACHE_NAME = 'midori-cache-v16';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -33,7 +33,16 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Caching core assets');
-      return cache.addAll(ASSETS_TO_CACHE);
+      // cache: 'reload' forces each precache fetch past the browser's own HTTP
+      // cache. Without it addAll() happily stores whatever the HTTP cache is
+      // already holding, so a freshly-installed worker can precache the very
+      // assets it was bumped to replace — bumping CACHE_NAME then looks like it
+      // shipped an update while every user keeps running the old JS. Observed
+      // directly: a v16 install cached a 19,075-byte ui-core.js while the
+      // server was serving 21,958 bytes.
+      return cache.addAll(
+        ASSETS_TO_CACHE.map((url) => new Request(url, { cache: 'reload' }))
+      );
     }).then(() => self.skipWaiting())
   );
 });

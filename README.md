@@ -88,7 +88,14 @@ Midori ships as plain `<script>`-tag JavaScript with no build step or bundler �
 
 ### Content-Security-Policy
 
-`index.html` sets a CSP that omits `'unsafe-inline'` from `script-src`. That means **no inline `<script>` blocks and no `onclick=` attributes** — anywhere, including in markup built by the renderers. Row-level actions go through the `[data-action]` / `data-arg` delegation table in `js/ui-core.js`; add new actions there rather than reaching for an inline handler. Any value interpolated into an HTML template string must be wrapped in `escapeHtml()` (defined in `js/state.js`).
+`index.html` sets a CSP that omits `'unsafe-inline'` from `script-src`. That means **no inline `<script>` blocks and no inline handler attributes of any kind** — anywhere, including in markup built by the renderers. This is not just `onclick`: `onsubmit`, `onchange`, `oninput` and friends are blocked identically, and **they fail silently**. The attribute stays visible in the HTML while the corresponding DOM property is `null`, so a form or filter looks correctly wired and simply does nothing. Grepping for `onclick` alone will miss it; grep for `on[a-z]*=`.
+
+Two places to wire things instead, both in `js/ui-core.js`:
+
+- **Clicks** on generated rows go through the `[data-action]` / `data-arg` delegation table (`DATA_ACTION_HANDLERS`).
+- **Everything else** — form `submit`, `change`, `input` — goes in the `INLINE_EVENT_BINDINGS` table, which binds by element id at startup and logs an error if an id is missing.
+
+Any value interpolated into an HTML template string must be wrapped in `escapeHtml()` (defined in `js/state.js`).
 
 ### Running the test suite
 

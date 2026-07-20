@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 5. Initialize Navigation
   setupNavigation();
   setupDelegatedActions();
+  setupDeclaredHandlers();
 
   // 6. Setup Form Color Pickers
   setupFormColorPickers();
@@ -313,6 +314,64 @@ function setupDelegatedActions() {
     if (!target) return;
     const handler = DATA_ACTION_HANDLERS[target.getAttribute('data-action')];
     if (handler) handler(target.getAttribute('data-arg'));
+  });
+}
+
+// Non-click handlers, wired here for the same reason as DATA_ACTION_HANDLERS:
+// the CSP omits 'unsafe-inline' from script-src, so the browser refuses to
+// compile ANY inline handler attribute. That is not limited to onclick —
+// onsubmit, onchange and oninput are blocked identically, and they fail
+// silently: the attribute stays visible in the HTML while the corresponding
+// property is null, so every form and filter looks wired and does nothing.
+// These cannot go through data-action because they are not clicks, and
+// several need the element's own value.
+const INLINE_EVENT_BINDINGS = [
+  ['baseCurrencySelect', 'change', (el) => changeBaseCurrency(el.value)],
+  ['budgetPeriodSelect', 'change', (el) => switchBudgetPeriod(el.value)],
+  ['filterSearch', 'input', () => renderLedger()],
+  ['filterWallet', 'change', () => renderLedger()],
+  ['filterTag', 'change', () => renderLedger()],
+  ['filterType', 'change', () => renderLedger()],
+  ['sync-auto-device-date', 'change', (el) => toggleAutoDeviceDate(el.checked)],
+  ['importFileInput', 'change', (el, event) => triggerStateImport(event)],
+
+  ['transactionForm', 'submit', (el, event) => submitTransactionForm(event)],
+  ['txType', 'change', () => handleTxTypeChange()],
+  ['txWallet', 'change', () => syncTransactionCurrencyDefault()],
+
+  ['walletForm', 'submit', (el, event) => submitWalletForm(event)],
+  ['editWalletForm', 'submit', (el, event) => submitEditWalletForm(event)],
+
+  ['categoryForm', 'submit', (el, event) => submitCategoryForm(event)],
+  ['catType', 'change', () => syncCategoryFormBudgetState()],
+
+  ['scheduleForm', 'submit', (el, event) => submitScheduleForm(event)],
+  ['schedType', 'change', () => syncScheduleCategoryOptions()],
+
+  ['editCategoryForm', 'submit', (el, event) => submitEditCategoryForm(event)],
+  ['editCatType', 'change', () => syncEditCategoryFormBudgetState()],
+
+  ['editTransactionForm', 'submit', (el, event) => submitEditTransactionForm(event)],
+  ['editTxType', 'change', () => handleEditTxTypeChange()],
+  ['editTxWallet', 'change', () => syncEditTransactionCurrencyDefault()],
+
+  ['editScheduleForm', 'submit', (el, event) => submitEditScheduleForm(event)],
+  ['editSchedType', 'change', () => syncEditScheduleCategoryOptions()],
+
+  ['editBudgetForm', 'submit', (el, event) => submitEditBudgetForm(event)],
+  ['pairingForm', 'submit', (el, event) => submitPairingForm(event)],
+];
+
+function setupDeclaredHandlers() {
+  INLINE_EVENT_BINDINGS.forEach(([id, type, handler]) => {
+    const el = document.getElementById(id);
+    if (!el) {
+      // Loud on purpose: a missing id here means a control is inert, which is
+      // exactly the failure mode this table exists to prevent.
+      console.error(`[Midori] Cannot bind ${type}: no element #${id}.`);
+      return;
+    }
+    el.addEventListener(type, (event) => handler(el, event));
   });
 }
 
