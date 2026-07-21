@@ -14,14 +14,16 @@
        renderers rely heavily on style="..." attributes.
        The file: source keeps the Android WebView wrapper working, which loads
        this page from file:///android_asset/ (an opaque origin 'self' misses).
-       connect-src is limited to the FX rates API and the ZenSync bucket. -->
+       connect-src is limited to the FX rates API and the Supabase project.
+       kvdb.io is still listed while state.js is migrated off it; remove that
+       source the moment the last kvdb call is gone. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self' file:;
     script-src 'self' file:;
     style-src 'self' file: 'unsafe-inline';
     font-src 'self' file: data:;
     img-src 'self' file: data: blob:;
-    connect-src 'self' file: https://open.er-api.com https://kvdb.io;
+    connect-src 'self' file: https://open.er-api.com https://kvdb.io https://hzgmjfgezlduxezbwpkm.supabase.co;
     media-src 'self' file: blob:;
     object-src 'none';
     base-uri 'none';
@@ -1272,6 +1274,11 @@
   <script src="js/dashboard.js"></script>
   <script src="js/wallets.js"></script>
   <script src="js/categories-budgets.js"></script>
+  <!-- Config must load before supabase-sync.js, which reads SUPABASE_URL at
+       call time. Both precede state.js so the sync transport exists before
+       anything tries to push. -->
+  <script src="js/supabase-config.js"></script>
+  <script src="js/supabase-sync.js"></script>
   <script src="js/transactions.js"></script>
   <script src="js/schedules.js"></script>
   <script src="js/sync.js"></script>

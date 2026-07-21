@@ -3,7 +3,7 @@
  * sw.js: Service Worker for complete offline capabilities
  */
 
-const CACHE_NAME = 'midori-cache-v21';
+const CACHE_NAME = 'midori-cache-v22';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -23,6 +23,8 @@ const ASSETS_TO_CACHE = [
   './js/transactions.js',
   './js/schedules.js',
   './js/sync.js',
+  './js/supabase-config.js',
+  './js/supabase-sync.js',
   './js/ui-core.js',
   './js/sw-register.js',
   './js/qrcode.min.js',
