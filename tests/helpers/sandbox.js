@@ -60,9 +60,14 @@ function createSandbox() {
 
   vm.createContext(sandbox);
 
+  // merge.js first: state.js runs loadState() as it loads, which reaches
+  // TOMBSTONE_TTL_MS. Declared later it would be in the temporal dead zone,
+  // and the load would throw instead of falling back.
+  const mergeSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'merge.js'), 'utf8');
   const stateSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'state.js'), 'utf8');
   const schedulerSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'scheduler.js'), 'utf8');
 
+  vm.runInContext(mergeSrc, sandbox, { filename: 'merge.js' });
   vm.runInContext(stateSrc, sandbox, { filename: 'state.js' });
   vm.runInContext(schedulerSrc, sandbox, { filename: 'scheduler.js' });
 

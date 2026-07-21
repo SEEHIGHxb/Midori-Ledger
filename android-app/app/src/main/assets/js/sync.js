@@ -3,7 +3,61 @@
  * sync.js: ZenSync cloud pairing, QR scanning & sync status UI.
  */
 
+// --- Cloud account (Supabase) ----------------------------------------------
+// Sign-in decides which row on the server belongs to this user. It is NOT what
+// keeps the ledger private — that is the AES key behind the pairing code, which
+// never leaves the device. Both are required for sync to work.
+
+function signInToCloud() {
+  signInWithGoogle();
+}
+
+function signOutOfCloud() {
+  if (!confirm('Sign out of the cloud account? Your ledger stays on this device, but syncing will stop until you sign in again.')) {
+    return;
+  }
+  signOutFromSupabase().then(() => {
+    renderCloudAccountUI();
+    renderAllViews();
+  });
+}
+
+// Reflects sign-in state in Settings. Called on load and after sign-in/out.
+function renderCloudAccountUI() {
+  const status = document.getElementById('supabase-account-status');
+  const hint = document.getElementById('supabase-account-hint');
+  const signInBtn = document.getElementById('btn-supabase-signin');
+  const signOutBtn = document.getElementById('btn-supabase-signout');
+  if (!status || !signInBtn || !signOutBtn) return;
+
+  const signedIn = typeof isSignedInToSupabase === 'function' && isSignedInToSupabase();
+
+  status.innerText = signedIn ? 'Signed in' : 'Not signed in';
+  status.style.color = signedIn ? 'var(--green-mint)' : '';
+  signInBtn.style.display = signedIn ? 'none' : 'inline-flex';
+  signOutBtn.style.display = signedIn ? 'inline-flex' : 'none';
+
+  if (!hint) return;
+  if (window.location.protocol === 'file:') {
+    // Google cannot redirect back to a file:// page, so sign-in genuinely
+    // cannot work here. Saying so is better than a button that dead-ends.
+    hint.innerText = 'Cloud sync needs the hosted version of Midori. Open the app from its web address to sign in.';
+    signInBtn.disabled = true;
+  } else {
+    hint.innerText = signedIn
+      ? 'Your ledger is encrypted on this device before upload — the server never holds the key.'
+      : 'Sign in to store your encrypted ledger. Your data is encrypted on this device first — the server never holds the key.';
+    signInBtn.disabled = false;
+  }
+}
+
 function enableZenSync() {
+  if (typeof isSignedInToSupabase === 'function' && !isSignedInToSupabase()) {
+    // Enabling sync without an account would queue pushes that every attempt
+    // rejects, and the only symptom would be a permanently amber status dot.
+    alert('Sign in to your cloud account first — that is what tells the server which ledger is yours.');
+    return;
+  }
   if (confirm('Enable secure Cloud Sync? A private Sync Key will be generated for pairing.')) {
     const creds = generateSyncCredentials();
     updatePreference('syncId', creds.syncId);

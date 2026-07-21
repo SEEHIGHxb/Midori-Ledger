@@ -77,6 +77,15 @@ function formatDisplayDate(dateStr) {
 
 // On page load initialization
 document.addEventListener('DOMContentLoaded', () => {
+  // 0. Finish any Google sign-in that is mid-flight. Google redirects back with
+  //    the tokens in the URL fragment, so this MUST run before anything asks
+  //    whether the user is signed in — the cloud pull in step 1 does exactly
+  //    that, and would give up as "not signed in" on the very load that just
+  //    completed the sign-in.
+  if (typeof captureSupabaseAuthRedirect === 'function') {
+    captureSupabaseAuthRedirect();
+  }
+
   // 1. Initial State Load
   if (MidoriState.wallets.length === 0) {
     if (MidoriState.preferences.autoSyncDeviceDate) {
@@ -122,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 7. Initial render
   renderAllViews();
   renderFxRatesUpdatedLabel();
+  renderCloudAccountUI();
 
   // 7b. Refresh live FX rates in the background (falls back to cached/hardcoded rates if offline)
   refreshFxRates().then(() => {
@@ -283,6 +293,8 @@ const DATA_ACTION_HANDLERS = {
   closeModal: (arg) => closeModal(arg),
   enableZenSync: () => enableZenSync(),
   disableZenSync: () => disableZenSync(),
+  signInToCloud: () => signInToCloud(),
+  signOutOfCloud: () => signOutOfCloud(),
   openPairingModal: () => openPairingModal(),
   copySyncField: (arg) => copySyncField(arg),
   toggleSyncKeyVisibility: () => toggleSyncKeyVisibility(),

@@ -95,11 +95,15 @@ let MidoriState = {
     syncEnabled: false,
     syncId: null,
     syncKey: null,
-    lastSyncedAt: 0
+    lastSyncedAt: 0,
+    cloudRevision: 0
   },
   virtualDate: '2026-05-20',
   updatedAt: 0,
-  fxRatesCache: null
+  fxRatesCache: null,
+  // id -> epoch ms of deletion. Carried in the synced payload so other devices
+  // learn about deletions they never saw. See js/merge.js.
+  deletions: {}
 };
 
 const LOCAL_STORAGE_KEY = 'midori_ledger_state';
@@ -195,6 +199,50 @@ function generateUUID() {
   return 'midori_' + randomToken(32);
 }
 
+// --- Sync bookkeeping -------------------------------------------------------
+// Every record carries its own updatedAt, and every deletion leaves a tombstone
+// in MidoriState.deletions. Both exist purely so mergeLedgerStates() (js/merge.js)
+// can reconcile two devices without losing work. See that file for the rules.
+//
+// The cost of forgetting to call these is silent and delayed: an untouched edit
+// loses to the other device's older copy, and an untombstoned delete comes back
+// on the next sync. Any new mutator must call them too.
+
+function touchRecord(record) {
+  if (record) record.updatedAt = Date.now();
+  return record;
+}
+
+function touchRecords(records) {
+  (records || []).forEach(touchRecord);
+}
+
+// Tombstone one or more ids. Accepts an array so cascading deletes (a wallet
+// taking its transactions and schedules with it) record every removed id —
+// tombstoning only the wallet would let the other device restore its orphans.
+function recordDeletion(idOrIds) {
+  if (!MidoriState.deletions) MidoriState.deletions = {};
+  const now = Date.now();
+  const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+  ids.forEach((id) => {
+    if (id) MidoriState.deletions[id] = now;
+  });
+}
+
+// Drop tombstones past their TTL so the map cannot grow without bound on a
+// device that deletes a lot and rarely syncs. Merging prunes as well; this
+// covers the local-only case. TOMBSTONE_TTL_MS comes from js/merge.js.
+function pruneExpiredDeletions() {
+  if (!MidoriState.deletions) return;
+  const ttl = (typeof TOMBSTONE_TTL_MS === 'number') ? TOMBSTONE_TTL_MS : (90 * 24 * 60 * 60 * 1000);
+  const cutoff = Date.now() - ttl;
+  Object.keys(MidoriState.deletions).forEach((id) => {
+    if ((Number(MidoriState.deletions[id]) || 0) < cutoff) {
+      delete MidoriState.deletions[id];
+    }
+  });
+}
+
 // Form input validators (shared by all add/edit form handlers in app.js)
 function validateAmount(value) {
   const num = Number(value);
@@ -217,13 +265,17 @@ function cleanupOrphanedFutureTransactions() {
     if (tx.scheduledId && !activeScheduleIds.has(tx.scheduledId)) {
       if (tx.date > MidoriState.virtualDate) {
         console.log(`Pruning orphaned future transaction: "${tx.title}" on ${tx.date}`);
+        // Tombstoned like any other delete. This runs after a merge too, where
+        // the orphan may have just arrived from the other device — without a
+        // tombstone it would be pruned here and re-delivered on every sync.
+        recordDeletion(tx.id);
         changed = true;
         return false;
       }
     }
     return true;
   });
-  
+
   if (changed) {
     saveState();
   }
@@ -249,7 +301,8 @@ function loadState() {
           syncEnabled: false,
           syncId: null,
           syncKey: null,
-          lastSyncedAt: 0
+          lastSyncedAt: 0,
+          cloudRevision: 0
         };
       } else {
         if (MidoriState.preferences.autoSyncDeviceDate === undefined) MidoriState.preferences.autoSyncDeviceDate = true;
@@ -257,6 +310,10 @@ function loadState() {
         if (MidoriState.preferences.syncId === undefined) MidoriState.preferences.syncId = null;
         if (MidoriState.preferences.syncKey === undefined) MidoriState.preferences.syncKey = null;
         if (MidoriState.preferences.lastSyncedAt === undefined) MidoriState.preferences.lastSyncedAt = 0;
+        // 0 means "this device has never seen a server revision". It can never
+        // match a real one (Postgres starts them at 1), so the first push after
+        // an upgrade is reported as a conflict and merges rather than clobbers.
+        if (MidoriState.preferences.cloudRevision === undefined) MidoriState.preferences.cloudRevision = 0;
       }
       
       // Clean up legacy non-UUID/non-mds syncId
@@ -279,6 +336,13 @@ function loadState() {
       if (MidoriState.fxRatesCache === undefined) {
         MidoriState.fxRatesCache = null;
       }
+      // Ledgers saved before per-record sync metadata existed have no tombstone
+      // map. An empty one is correct: nothing has been deleted since the upgrade,
+      // and records with no updatedAt are handled as legacy by the merge.
+      if (!MidoriState.deletions || typeof MidoriState.deletions !== 'object') {
+        MidoriState.deletions = {};
+      }
+      pruneExpiredDeletions();
 
       // Clean up legacy orphaned future transactions
       cleanupOrphanedFutureTransactions();
@@ -325,10 +389,12 @@ function resetToDefaultState() {
       syncEnabled: false,
       syncId: null,
       syncKey: null,
-      lastSyncedAt: 0
+      lastSyncedAt: 0,
+      cloudRevision: 0
     },
     virtualDate: today,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    deletions: {}
   };
   
   // Set default categories
@@ -369,7 +435,8 @@ function clearDatabase() {
       syncEnabled: false,
       syncId: null,
       syncKey: null,
-      lastSyncedAt: 0
+      lastSyncedAt: 0,
+      cloudRevision: 0
     },
     virtualDate: getDeviceTodayDateStr(),
     updatedAt: Date.now()
@@ -685,6 +752,7 @@ function recalculateWalletBalances() {
 function addWallet(wallet) {
   wallet.id = generateUUID();
   wallet.balance = Number(wallet.balance) || 0;
+  touchRecord(wallet);
   MidoriState.wallets.push(wallet);
   saveState();
 }
@@ -692,7 +760,7 @@ function addWallet(wallet) {
 function updateWallet(walletId, updatedFields) {
   const index = MidoriState.wallets.findIndex(w => w.id === walletId);
   if (index !== -1) {
-    MidoriState.wallets[index] = { ...MidoriState.wallets[index], ...updatedFields };
+    MidoriState.wallets[index] = touchRecord({ ...MidoriState.wallets[index], ...updatedFields });
     saveState();
   }
 }
@@ -704,13 +772,24 @@ function deleteWallet(walletId) {
   // left transfers whose toWalletId pointed at the deleted wallet: the source
   // was still debited but nothing was credited, so the transferred amount
   // silently vanished from net worth.
+  const removedTransactions = MidoriState.transactions.filter(
+    t => t.walletId === walletId || t.toWalletId === walletId
+  );
   MidoriState.transactions = MidoriState.transactions.filter(
     t => t.walletId !== walletId && t.toWalletId !== walletId
   );
 
   // Schedules pointing at a deleted wallet would keep generating transactions
   // into an account that no longer exists.
+  const removedSchedules = MidoriState.schedules.filter(s => s.walletId === walletId);
   MidoriState.schedules = MidoriState.schedules.filter(s => s.walletId !== walletId);
+
+  // The whole cascade is tombstoned, not just the wallet: another device still
+  // holding those transactions and schedules would otherwise re-add them on the
+  // next sync, leaving orphans pointing at a wallet that no longer exists.
+  recordDeletion([walletId]
+    .concat(removedTransactions.map(t => t.id))
+    .concat(removedSchedules.map(s => s.id)));
 
   // Every other mutator recalculates; this one did not, so the remaining
   // wallets kept balances that included the now-deleted transactions until
@@ -724,6 +803,7 @@ function addCategory(category) {
   category.budget = category.budget ? Number(category.budget) : null;
   category.yearlyBudget = category.yearlyBudget ? Number(category.yearlyBudget) : (category.budget ? category.budget * 12 : null);
   category.includeInBudget = category.includeInBudget !== undefined ? !!category.includeInBudget : (category.type === 'expense');
+  touchRecord(category);
   MidoriState.categories.push(category);
   saveState();
 }
@@ -740,7 +820,7 @@ function updateCategory(categoryId, updatedFields) {
     if (updatedFields.includeInBudget !== undefined) {
       updatedFields.includeInBudget = !!updatedFields.includeInBudget;
     }
-    MidoriState.categories[index] = { ...MidoriState.categories[index], ...updatedFields };
+    MidoriState.categories[index] = touchRecord({ ...MidoriState.categories[index], ...updatedFields });
     saveState();
   }
 }
@@ -752,16 +832,24 @@ function deleteCategory(categoryId) {
   // Transaction history is preserved (it just becomes uncategorised), but
   // schedules are deactivated because they would otherwise keep minting new
   // transactions against a category the user deliberately removed.
+  // These are edits, not deletions, so they are touched rather than tombstoned —
+  // without that the other device's copy still carries the dead categoryId and,
+  // being untouched-but-equal, could win the merge and restore the broken link.
   MidoriState.transactions.forEach(tx => {
-    if (tx.categoryId === categoryId) tx.categoryId = null;
+    if (tx.categoryId === categoryId) {
+      tx.categoryId = null;
+      touchRecord(tx);
+    }
   });
   MidoriState.schedules.forEach(schedule => {
     if (schedule.categoryId === categoryId) {
       schedule.categoryId = null;
       schedule.active = false;
+      touchRecord(schedule);
     }
   });
 
+  recordDeletion(categoryId);
   saveState();
 }
 
@@ -770,6 +858,7 @@ function addTransaction(tx) {
   tx.id = generateUUID();
   tx.amount = Number(tx.amount);
   tx.date = tx.date || MidoriState.virtualDate;
+  touchRecord(tx);
   MidoriState.transactions.push(tx);
   recalculateWalletBalances();
 }
@@ -778,6 +867,7 @@ function deleteTransaction(txId) {
   const txIndex = MidoriState.transactions.findIndex(t => t.id === txId);
   if (txIndex !== -1) {
     MidoriState.transactions.splice(txIndex, 1);
+    recordDeletion(txId);
     recalculateWalletBalances();
   }
 }
@@ -788,7 +878,7 @@ function updateTransaction(txId, updatedFields) {
     if (updatedFields.amount !== undefined) {
       updatedFields.amount = Number(updatedFields.amount);
     }
-    MidoriState.transactions[index] = { ...MidoriState.transactions[index], ...updatedFields };
+    MidoriState.transactions[index] = touchRecord({ ...MidoriState.transactions[index], ...updatedFields });
     recalculateWalletBalances();
   }
 }
@@ -798,6 +888,7 @@ function addSchedule(schedule) {
   schedule.id = generateUUID();
   schedule.amount = Number(schedule.amount);
   schedule.active = true;
+  touchRecord(schedule);
   MidoriState.schedules.push(schedule);
   saveState();
 }
@@ -805,7 +896,7 @@ function addSchedule(schedule) {
 function updateSchedule(schedId, updatedFields) {
   const index = MidoriState.schedules.findIndex(s => s.id === schedId);
   if (index !== -1) {
-    MidoriState.schedules[index] = { ...MidoriState.schedules[index], ...updatedFields };
+    MidoriState.schedules[index] = touchRecord({ ...MidoriState.schedules[index], ...updatedFields });
     saveState();
   }
 }
@@ -813,7 +904,14 @@ function updateSchedule(schedId, updatedFields) {
 function deleteSchedule(schedId) {
   MidoriState.schedules = MidoriState.schedules.filter(s => s.id !== schedId);
   // Delete only future occurrences of this schedule (relative to virtualDate) so past history is preserved!
+  const removedTransactions = MidoriState.transactions.filter(
+    t => t.scheduledId === schedId && t.date > MidoriState.virtualDate
+  );
   MidoriState.transactions = MidoriState.transactions.filter(t => t.scheduledId !== schedId || t.date <= MidoriState.virtualDate);
+
+  // Past occurrences are deliberately NOT tombstoned — they survive here, so
+  // tombstoning them would delete real history off the user's other devices.
+  recordDeletion([schedId].concat(removedTransactions.map(t => t.id)));
   saveState();
   recalculateWalletBalances();
 }
@@ -1007,10 +1105,10 @@ function generateSyncCredentials() {
 let syncDebounceTimeout = null;
 
 function triggerAutoSyncPush() {
-  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncKey || !MidoriState.preferences.syncId) {
+  if (!canSync()) {
     return;
   }
-  
+
   if (syncDebounceTimeout) {
     clearTimeout(syncDebounceTimeout);
   }
@@ -1020,44 +1118,116 @@ function triggerAutoSyncPush() {
   }, 2000);
 }
 
-async function pushStateToCloud() {
-  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncKey || !MidoriState.preferences.syncId) {
-    return false;
+// A push that loses the compare-and-swap merges and tries again. Bounded,
+// because each retry is only useful if the OTHER device has stopped writing —
+// an unbounded loop against a busy peer would spin forever.
+const SYNC_PUSH_MAX_ATTEMPTS = 3;
+
+// The server revision this device last successfully wrote or read. This, not a
+// timestamp, is what decides whether a push is safe: it is assigned by Postgres
+// and increments monotonically, so it cannot be skewed by a wrong device clock.
+// The previous implementation compared Date.now() across devices, and a clock
+// that was behind silently discarded the newer ledger.
+function getCloudRevision() {
+  return Number(MidoriState.preferences.cloudRevision) || 0;
+}
+
+function setCloudRevision(revision) {
+  MidoriState.preferences.cloudRevision = Number(revision) || 0;
+}
+
+function canSync() {
+  return !!(MidoriState.preferences.syncEnabled
+    && MidoriState.preferences.syncKey
+    && MidoriState.preferences.syncId
+    && typeof isSignedInToSupabase === 'function'
+    && isSignedInToSupabase());
+}
+
+async function decryptEnvelopeToState(encryptedData) {
+  const decryptedJson = await decryptData(
+    encryptedData,
+    MidoriState.preferences.syncKey,
+    MidoriState.preferences.syncId
+  );
+  const parsed = JSON.parse(decryptedJson);
+  // The payload is authenticated by AES-GCM, so this is not a trust boundary —
+  // it catches a ledger from an incompatible version, which would otherwise
+  // merge into a state with missing collections and throw somewhere less obvious.
+  if (!isValidStateShape(parsed)) {
+    throw new Error('Cloud ledger has an unrecognised shape; refusing to merge it.');
   }
-  
-  updateSyncStatusIndicator('syncing');
-  
-  const syncId = MidoriState.preferences.syncId;
-  const syncKey = MidoriState.preferences.syncKey;
-  
+  return parsed;
+}
+
+/**
+ * Merges a decrypted remote ledger into the live state and persists it.
+ *
+ * Writes to localStorage directly rather than through saveState(), because
+ * saveState() schedules another auto-push — applying an incoming merge would
+ * queue a push that queues a merge, and two devices left open would trade
+ * writes indefinitely. The caller pushes once, explicitly, when it needs to.
+ */
+function applyRemoteState(remoteState) {
+  MidoriState = mergeLedgerStates(MidoriState, remoteState, Date.now());
+
+  cleanupOrphanedFutureTransactions();
+  recalculateWalletBalances();
+
   try {
-    const plaintext = JSON.stringify(MidoriState);
-    const encrypted = await encryptData(plaintext, syncKey, syncId);
-    const cloudEnvelope = {
-      encryptedData: encrypted,
-      updatedAt: MidoriState.updatedAt || Date.now()
-    };
-    
-    // Push encrypted payload to our fully verified, secure, and private shared kvdb.io bucket
-    const url = `https://kvdb.io/5yEvZD6HDwqvEzFwXk2nPr/${syncId}`;
-    
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(cloudEnvelope)
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
-    }
-    
-    MidoriState.preferences.lastSyncedAt = Date.now();
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
-    console.log('Successfully pushed state to cloud.');
-    updateSyncStatusIndicator('synced');
-    return true;
+  } catch (e) {
+    console.error('Merged ledger could not be persisted locally.', e);
+    window.dispatchEvent(new CustomEvent('midoriStorageQuotaExceeded'));
+  }
+  window.dispatchEvent(new CustomEvent('midoriStateChanged'));
+}
+
+async function pushStateToCloud() {
+  if (!canSync()) return false;
+
+  updateSyncStatusIndicator('syncing');
+
+  try {
+    for (let attempt = 1; attempt <= SYNC_PUSH_MAX_ATTEMPTS; attempt++) {
+      const encrypted = await encryptData(
+        JSON.stringify(MidoriState),
+        MidoriState.preferences.syncKey,
+        MidoriState.preferences.syncId
+      );
+
+      const result = await supabasePushEnvelope(
+        encrypted,
+        MidoriState.updatedAt || Date.now(),
+        getCloudRevision()
+      );
+
+      if (result && result.status === 'conflict') {
+        // Expected, not an error: another device wrote since this one last read.
+        // The response carries that device's ledger, so merge it in and retry
+        // against the revision it reported. Overwriting here is exactly the
+        // data loss this whole mechanism exists to prevent.
+        console.log(`Push conflicted at revision ${result.revision}; merging and retrying (attempt ${attempt}).`);
+        if (result.encrypted_data) {
+          applyRemoteState(await decryptEnvelopeToState(result.encrypted_data));
+        }
+        setCloudRevision(result.revision);
+        continue;
+      }
+
+      setCloudRevision(result && result.revision);
+      MidoriState.preferences.lastSyncedAt = Date.now();
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+      updateSyncStatusIndicator('synced');
+      return true;
+    }
+
+    // Losing the race this many times in a row means another device is writing
+    // continuously. Local data is intact and the next push will try again;
+    // reporting an error is honest about the ledger not being uploaded yet.
+    console.warn(`Gave up pushing after ${SYNC_PUSH_MAX_ATTEMPTS} conflicting attempts.`);
+    updateSyncStatusIndicator('error');
+    return false;
   } catch (e) {
     console.error('Failed to push state to cloud:', e);
     updateSyncStatusIndicator('error');
@@ -1066,60 +1236,26 @@ async function pushStateToCloud() {
 }
 
 async function pullStateFromCloud() {
-  if (!MidoriState.preferences.syncEnabled || !MidoriState.preferences.syncId || !MidoriState.preferences.syncKey) {
-    return false;
-  }
-  
+  if (!canSync()) return false;
+
   updateSyncStatusIndicator('syncing');
-  
-  const syncId = MidoriState.preferences.syncId;
-  const syncKey = MidoriState.preferences.syncKey;
-  const url = `https://kvdb.io/5yEvZD6HDwqvEzFwXk2nPr/${syncId}`;
-  
+
   try {
-    const response = await fetch(url);
-    if (response.status === 404) {
-      console.log('State not found on cloud. Re-initializing cloud with local state.');
-      await pushStateToCloud();
-      updateSyncStatusIndicator('synced');
-      return true;
+    const envelope = await supabasePullEnvelope();
+
+    if (!envelope) {
+      // Nothing stored yet — this is the first device to sync this account.
+      console.log('No ledger in the cloud yet; seeding it from this device.');
+      return await pushStateToCloud();
     }
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch state: ${response.statusText}`);
-    }
-    
-    const cloudEnvelope = await response.json();
-    if (!cloudEnvelope || !cloudEnvelope.encryptedData || !cloudEnvelope.updatedAt) {
-      throw new Error('Invalid cloud response envelope.');
-    }
-    
-    const decryptedJson = await decryptData(cloudEnvelope.encryptedData, syncKey, syncId);
-    const parsedState = JSON.parse(decryptedJson);
-    
-    const localUpdatedAt = MidoriState.updatedAt || 0;
-    const cloudUpdatedAt = cloudEnvelope.updatedAt;
-    
-    if (cloudUpdatedAt > localUpdatedAt) {
-      console.log(`Cloud state is newer (${cloudUpdatedAt} > ${localUpdatedAt}). Applying cloud state.`);
-      MidoriState = parsedState;
-      MidoriState.preferences.lastSyncedAt = Date.now();
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
-      
-      cleanupOrphanedFutureTransactions();
-      recalculateWalletBalances();
-      
-      window.dispatchEvent(new CustomEvent('midoriStateChanged'));
-      updateSyncStatusIndicator('synced');
-      return true;
-    } else if (localUpdatedAt > cloudUpdatedAt) {
-      console.log(`Local state is newer (${localUpdatedAt} > ${cloudUpdatedAt}). Pushing local state to cloud.`);
-      await pushStateToCloud();
-    } else {
-      console.log('Local and cloud states are in perfect sync.');
-      updateSyncStatusIndicator('synced');
-    }
-    return true;
+
+    applyRemoteState(await decryptEnvelopeToState(envelope.encrypted_data));
+    setCloudRevision(envelope.revision);
+
+    // Push straight back. The merge result almost always differs from what the
+    // server holds — it now contains this device's records too — and leaving it
+    // unpushed would mean the other device never learns about them.
+    return await pushStateToCloud();
   } catch (e) {
     console.error('Failed to pull state from cloud:', e);
     updateSyncStatusIndicator('error');

@@ -15,15 +15,16 @@
        The file: source keeps the Android WebView wrapper working, which loads
        this page from file:///android_asset/ (an opaque origin 'self' misses).
        connect-src is limited to the FX rates API and the Supabase project.
-       kvdb.io is still listed while state.js is migrated off it; remove that
-       source the moment the last kvdb call is gone. -->
+       kvdb.io was removed once the last call to it left state.js: the old sync
+       bucket was world-readable and world-writable by anyone who learned the
+       (publicly visible) bucket id. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self' file:;
     script-src 'self' file:;
     style-src 'self' file: 'unsafe-inline';
     font-src 'self' file: data:;
     img-src 'self' file: data: blob:;
-    connect-src 'self' file: https://open.er-api.com https://kvdb.io https://hzgmjfgezlduxezbwpkm.supabase.co;
+    connect-src 'self' file: https://open.er-api.com https://hzgmjfgezlduxezbwpkm.supabase.co;
     media-src 'self' file: blob:;
     object-src 'none';
     base-uri 'none';
@@ -496,6 +497,24 @@
               <input type="checkbox" id="sync-auto-device-date" checked style="width:16px; height:16px; accent-color:var(--green-matcha); cursor:pointer;">
               <span>Auto-Advance virtual system date to today on application startup</span>
             </label>
+          </div>
+
+          <!-- Signing in and pairing do two different jobs, so both exist:
+               the Google account decides WHOSE ledger row this is on the server,
+               while the pairing key is what encrypts it. The server only ever
+               stores ciphertext, so signing in alone cannot read your data. -->
+          <div id="supabase-account-row" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <div>
+                <div style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Cloud Account</div>
+                <span id="supabase-account-status" style="font-size: 13px; opacity: 0.85;">Not signed in</span>
+              </div>
+              <div class="settings-action-row" style="margin: 0;">
+                <button class="add-btn" id="btn-supabase-signin" data-action="signInToCloud">Sign in with Google</button>
+                <button class="btn-secondary" id="btn-supabase-signout" data-action="signOutOfCloud" style="display: none;">Sign out</button>
+              </div>
+            </div>
+            <p id="supabase-account-hint" style="font-size: 12px; opacity: 0.65; margin: 12px 0 0;">Sign in to store your encrypted ledger. Your data is encrypted on this device first — the server never holds the key.</p>
           </div>
 
           <div id="zensync-disabled-view">
@@ -1266,6 +1285,14 @@
   <script src="js/jsqr.min.js"></script>
 
   <!-- Core Javascript Engines -->
+  <!-- These three MUST precede state.js. state.js calls loadState() at the end
+       of the file, which reaches pruneExpiredDeletions() -> TOMBSTONE_TTL_MS in
+       merge.js. A `const` declared later is in the temporal dead zone, where
+       even `typeof` throws rather than returning "undefined" — so a defensive
+       typeof guard does NOT make the order optional. -->
+  <script src="js/merge.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/supabase-sync.js"></script>
   <script src="js/state.js"></script>
   <script src="js/scheduler.js"></script>
   <script src="js/charts.js"></script>
@@ -1274,11 +1301,6 @@
   <script src="js/dashboard.js"></script>
   <script src="js/wallets.js"></script>
   <script src="js/categories-budgets.js"></script>
-  <!-- Config must load before supabase-sync.js, which reads SUPABASE_URL at
-       call time. Both precede state.js so the sync transport exists before
-       anything tries to push. -->
-  <script src="js/supabase-config.js"></script>
-  <script src="js/supabase-sync.js"></script>
   <script src="js/transactions.js"></script>
   <script src="js/schedules.js"></script>
   <script src="js/sync.js"></script>
