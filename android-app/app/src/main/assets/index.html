@@ -396,6 +396,29 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
             <span>No transactions matching criteria are logged. Record a new transaction!</span>
           </div>
+
+          <!-- Rows-per-page and page navigation. This is static markup rather
+               than something renderLedger builds, because the CSP forbids
+               inline handlers: these controls are bound by id at startup in
+               js/ui-core.js, and elements created after that point would never
+               be wired up. renderLedgerPagination only updates their contents. -->
+          <div class="ledger-pagination" id="ledgerPagination" style="display: none;">
+            <div class="ledger-pagination-size">
+              <label for="ledgerPageSize">Rows per page</label>
+              <select id="ledgerPageSize" class="form-control">
+                <option value="20">20</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div class="ledger-pagination-nav">
+              <button type="button" class="btn-page" id="ledgerPrevPage" data-action="ledgerPrevPage">Previous</button>
+              <!-- aria-live so a screen reader announces the new range after a
+                   page change; the button labels alone never say where you are. -->
+              <span id="ledgerPageStatus" aria-live="polite"></span>
+              <button type="button" class="btn-page" id="ledgerNextPage" data-action="ledgerNextPage">Next</button>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -293,6 +293,8 @@ const DATA_ACTION_HANDLERS = {
   triggerStateReset: () => triggerStateReset(),
   startQRScanner: () => startQRScanner(),
   stopQRScanner: () => stopQRScanner(),
+  ledgerPrevPage: () => changeLedgerPage(-1),
+  ledgerNextPage: () => changeLedgerPage(1),
   // Row-level actions on dynamically rendered lists. These were inline
   // onclick="fn('id')" attributes built by string interpolation, which both
   // widened the XSS surface and blocked a Content-Security-Policy without
@@ -329,10 +331,14 @@ function setupDelegatedActions() {
 const INLINE_EVENT_BINDINGS = [
   ['baseCurrencySelect', 'change', (el) => changeBaseCurrency(el.value)],
   ['budgetPeriodSelect', 'change', (el) => switchBudgetPeriod(el.value)],
-  ['filterSearch', 'input', () => renderLedger()],
-  ['filterWallet', 'change', () => renderLedger()],
-  ['filterTag', 'change', () => renderLedger()],
-  ['filterType', 'change', () => renderLedger()],
+  // These reset to page 1 rather than calling renderLedger directly: narrowing
+  // the results while on a later page would otherwise leave the user staring
+  // at an empty table with matches sitting on page 1.
+  ['filterSearch', 'input', () => resetLedgerPageAndRender()],
+  ['filterWallet', 'change', () => resetLedgerPageAndRender()],
+  ['filterTag', 'change', () => resetLedgerPageAndRender()],
+  ['filterType', 'change', () => resetLedgerPageAndRender()],
+  ['ledgerPageSize', 'change', (el) => setLedgerPageSize(el.value)],
   ['sync-auto-device-date', 'change', (el) => toggleAutoDeviceDate(el.checked)],
   ['importFileInput', 'change', (el, event) => triggerStateImport(event)],
 

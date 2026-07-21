@@ -787,6 +787,82 @@ body.light-theme .date-badge {
   }
 }
 
+/* Ledger pagination bar. display is toggled between none and flex by
+   renderLedgerPagination, so the value here is only the starting point. */
+.ledger-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 4px 4px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 8px;
+}
+
+.ledger-pagination-size,
+.ledger-pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ledger-pagination-size label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Sized to its content so the rows-per-page control does not stretch to the
+   full-width .form-control default it inherits. */
+.ledger-pagination-size .form-control {
+  width: auto;
+  padding: 6px 10px;
+}
+
+#ledgerPageStatus {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'Outfit', sans-serif;
+  white-space: nowrap;
+  /* The text swings between "1–20 of 7" and "981–1000 of 1000" as pages
+     change; without a floor, the buttons on either side jump around under the
+     cursor between clicks. */
+  min-width: 170px;
+  text-align: center;
+}
+
+.btn-page {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 10px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-page:hover:not(:disabled) {
+  border-color: var(--green-mint);
+  color: var(--green-mint);
+}
+
+/* Disabled at the first and last page. Kept visible rather than hidden so the
+   bar does not reflow and slide the other button under the user's cursor. */
+.btn-page:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (max-width: 600px) {
+  .ledger-pagination {
+    justify-content: center;
+  }
+}
+
 .input-group {
   display: flex;
   flex-direction: column;

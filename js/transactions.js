@@ -3,11 +3,70 @@
  * transactions.js: Ledger rendering, transaction create/edit/delete CRUD.
  */
 
+const LEDGER_PAGE_SIZES = [20, 50, 100];
+const DEFAULT_LEDGER_PAGE_SIZE = 50;
+
+// Rows-per-page lives in its own localStorage key rather than in
+// MidoriState.preferences for two reasons: preferences are part of the synced,
+// encrypted payload, so changing a display setting would bump updatedAt and
+// push the entire ledger to the cloud; and the right value genuinely differs
+// per device — 20 suits a phone, 100 suits a desktop — so syncing it would
+// make two paired devices fight over the setting.
+const LEDGER_PAGE_SIZE_STORAGE_KEY = 'midori_ledger_page_size';
+
+let ledgerPage = 1;
+let ledgerPageSize = readStoredLedgerPageSize();
+
+function readStoredLedgerPageSize() {
+  try {
+    const stored = Number(localStorage.getItem(LEDGER_PAGE_SIZE_STORAGE_KEY));
+    // Whitelist rather than a range check: a stored value of 5000 would
+    // otherwise be honoured and reintroduce the very render cost pagination
+    // exists to avoid.
+    return LEDGER_PAGE_SIZES.includes(stored) ? stored : DEFAULT_LEDGER_PAGE_SIZE;
+  } catch (e) {
+    // localStorage access throws outright in some private-browsing modes. A
+    // display preference is never worth breaking the ledger over.
+    console.warn('Could not read stored ledger page size:', e);
+    return DEFAULT_LEDGER_PAGE_SIZE;
+  }
+}
+
+function setLedgerPageSize(value) {
+  const size = Number(value);
+  if (!LEDGER_PAGE_SIZES.includes(size)) return;
+  ledgerPageSize = size;
+  try {
+    localStorage.setItem(LEDGER_PAGE_SIZE_STORAGE_KEY, String(size));
+  } catch (e) {
+    console.warn('Could not persist ledger page size:', e);
+  }
+  // Back to page 1: the row at the top of page 3 at 20/page sits somewhere
+  // entirely different at 100/page, so keeping the number lands the user in an
+  // arbitrary spot rather than near where they were.
+  ledgerPage = 1;
+  renderLedger();
+}
+
+function changeLedgerPage(delta) {
+  ledgerPage += delta;
+  renderLedger();
+}
+
+// Any filter change must send the user back to page 1: narrowing 900
+// transactions down to 4 while sitting on page 6 would otherwise render an
+// empty table even though there are matches.
+function resetLedgerPageAndRender() {
+  ledgerPage = 1;
+  renderLedger();
+}
+
 function renderLedger() {
   const tbody = document.getElementById('ledgerTableBody');
   const emptyState = document.getElementById('ledgerEmptyState');
+  const pagination = document.getElementById('ledgerPagination');
   if (!tbody) return;
-  
+
   tbody.innerHTML = '';
 
   // Get search criteria
@@ -31,10 +90,22 @@ function renderLedger() {
 
   if (filtered.length === 0) {
     emptyState.style.display = 'flex';
+    if (pagination) pagination.style.display = 'none';
     return;
   } else {
     emptyState.style.display = 'none';
   }
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ledgerPageSize));
+  // Clamping here rather than at the call sites covers every way the page can
+  // fall out of range at once: deleting the last row on the final page, a
+  // filter narrowing the result set, or a cloud sync replacing the ledger
+  // wholesale. Without it the table renders empty while matches exist.
+  if (ledgerPage > totalPages) ledgerPage = totalPages;
+  if (ledgerPage < 1) ledgerPage = 1;
+
+  const startIndex = (ledgerPage - 1) * ledgerPageSize;
+  const pageTransactions = filtered.slice(startIndex, startIndex + ledgerPageSize);
 
   // Look-ups built once instead of a linear scan per row. Minor next to the
   // batching below, but it turns the per-row cost from O(wallets + categories)
@@ -42,14 +113,17 @@ function renderLedger() {
   const walletsById = new Map(MidoriState.wallets.map(w => [w.id, w]));
   const categoriesById = new Map(MidoriState.categories.map(c => [c.id, c]));
 
-  // Rows are accumulated here and inserted in ONE call after the loop.
-  // insertAdjacentHTML per row made the browser parse HTML and mutate the DOM
-  // once per transaction: renderLedger measured 362ms of a 350ms full re-render
-  // at 5,000 transactions — essentially the entire cost of every state change
-  // in the app. Every other renderer combined was under 10ms.
+  // Rows are accumulated here and inserted in ONE call after the loop, rather
+  // than one insertAdjacentHTML per row.
+  //
+  // This mattered far more before pagination, when renderLedger measured 362ms
+  // of a 350ms full re-render at 5,000 transactions — essentially the entire
+  // cost of every state change in the app. Now that at most 100 rows are ever
+  // built the win is small in absolute terms, but the page size is the user's
+  // choice and the batching costs nothing to keep.
   const rows = [];
 
-  filtered.forEach(tx => {
+  pageTransactions.forEach(tx => {
     const wallet = walletsById.get(tx.walletId);
     const toWallet = tx.toWalletId ? walletsById.get(tx.toWalletId) : null;
     const category = categoriesById.get(tx.categoryId);
@@ -148,6 +222,38 @@ function renderLedger() {
   });
 
   tbody.insertAdjacentHTML('beforeend', rows.join(''));
+
+  renderLedgerPagination(filtered.length, totalPages, startIndex, pageTransactions.length);
+}
+
+function renderLedgerPagination(totalCount, totalPages, startIndex, pageCount) {
+  const pagination = document.getElementById('ledgerPagination');
+  if (!pagination) return;
+
+  pagination.style.display = 'flex';
+
+  const sizeSelect = document.getElementById('ledgerPageSize');
+  // Kept in step with the module variable rather than trusted as the source of
+  // truth: the stored preference is applied at startup before this select has
+  // been touched, and a re-render must not silently adopt whatever the markup
+  // happens to have selected.
+  if (sizeSelect && Number(sizeSelect.value) !== ledgerPageSize) {
+    sizeSelect.value = String(ledgerPageSize);
+  }
+
+  const status = document.getElementById('ledgerPageStatus');
+  if (status) {
+    const firstShown = startIndex + 1;
+    const lastShown = startIndex + pageCount;
+    status.innerText = `${firstShown}–${lastShown} of ${totalCount}  ·  Page ${ledgerPage} of ${totalPages}`;
+  }
+
+  // Disabling rather than hiding: buttons that vanish at the ends make the bar
+  // reflow and shift the other control under the user's cursor mid-click.
+  const prevBtn = document.getElementById('ledgerPrevPage');
+  const nextBtn = document.getElementById('ledgerNextPage');
+  if (prevBtn) prevBtn.disabled = ledgerPage <= 1;
+  if (nextBtn) nextBtn.disabled = ledgerPage >= totalPages;
 }
 
 function triggerTransactionDelete(id) {
