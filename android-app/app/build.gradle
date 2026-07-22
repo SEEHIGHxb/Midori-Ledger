@@ -31,4 +31,7 @@ android {
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'
+    // Custom Tabs: Google sign-in runs in a real Chrome surface, which Google
+    // accepts, rather than the WebView, which it blocks. See MainActivity.
+    implementation 'androidx.browser:browser:1.7.0'
 }

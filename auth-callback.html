@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signing in… — Midori</title>
+  <!--
+    This page exists ONLY for the Android wrapper's Google sign-in.
+
+    Google refuses OAuth inside a WebView, so the app opens auth in a Custom Tab
+    (real Chrome). Supabase finishes by redirecting HERE with the tokens in the
+    URL fragment. The Custom Tab is a separate browser context, so those tokens
+    cannot reach the app's WebView directly — this page forwards them over the
+    com.midori.ledger:// deep link, which MainActivity catches.
+
+    Why a visible button rather than an automatic redirect: Chrome commonly
+    blocks launching an external app from a redirect that had no user gesture.
+    A real tap is reliable. The auto-attempt below covers the lenient case; the
+    button is the guarantee.
+
+    The token sits in this page's fragment for a moment and is never sent
+    anywhere — fragments are not transmitted to servers and this page makes no
+    network requests. Inline styles/script are used because it is a standalone,
+    single-purpose page outside the app's CSP.
+  -->
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f4f7f2; color: #1e381b;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #12180f; color: #dfe9d8; }
+    }
+    .card { max-width: 320px; padding: 0 28px; text-align: center; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    p { margin: 0 0 20px; opacity: 0.75; line-height: 1.5; font-size: 15px; }
+    a.button {
+      display: inline-block; padding: 13px 26px;
+      background: #4a7c59; color: #fff; font-weight: 600;
+      border-radius: 12px; text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Almost there</h1>
+    <p id="msg">Returning you to Midori…</p>
+    <a id="return" class="button" href="#">Return to Midori</a>
+  </div>
+  <script>
+    (function () {
+      // Forward the fragment as-is: on success it carries the tokens, on
+      // cancellation/error it carries error params, both of which the app knows
+      // how to read. If there is no fragment, an error may be in the query.
+      var payload = window.location.hash ? window.location.hash.substring(1) : '';
+      if (!payload && window.location.search) {
+        payload = window.location.search.substring(1);
+      }
+      var deepLink = 'com.midori.ledger://auth' + (payload ? '#' + payload : '');
+
+      var link = document.getElementById('return');
+      link.setAttribute('href', deepLink);
+
+      // Best-effort automatic return for Chrome versions that allow it.
+      try { window.location.href = deepLink; } catch (e) { /* fall through */ }
+
+      // If still here shortly after, the auto-launch was blocked — ask for the tap.
+      setTimeout(function () {
+        document.getElementById('msg').textContent = 'Tap the button to return to Midori.';
+      }, 900);
+    })();
+  </script>
+</body>
+</html>

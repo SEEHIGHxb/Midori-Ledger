@@ -69,17 +69,50 @@ function getAuthRedirectTarget() {
   return window.location.origin + window.location.pathname;
 }
 
+/**
+ * True when running inside the Midori Android wrapper. The wrapper appends a
+ * marker to the WebView user-agent (see MainActivity). Detection is via the UA
+ * rather than a JavaScript bridge on purpose: the WebView now loads remote
+ * content, and an injected bridge object would be callable by any script on the
+ * page. A UA string it can only read is a smaller surface.
+ */
+function isAndroidWrapper() {
+  return typeof navigator !== 'undefined'
+    && typeof navigator.userAgent === 'string'
+    && navigator.userAgent.indexOf('MidoriAndroid') !== -1;
+}
+
+/**
+ * The bridge page Supabase redirects to after auth INSIDE the Android wrapper.
+ * Resolved relative to the current page so it is correct whatever the GitHub
+ * Pages base path is. It runs in the Custom Tab (real Chrome) and forwards the
+ * result to the app over the com.midori.ledger:// deep link — the WebView can
+ * neither complete Google OAuth nor read the Custom Tab's URL, so the round
+ * trip has to come back through a link the app registers.
+ */
+function getAndroidAuthCallbackUrl() {
+  return new URL('auth-callback.html', window.location.href).href;
+}
+
 function signInWithGoogle() {
-  if (window.location.protocol === 'file:') {
+  if (!isAndroidWrapper() && window.location.protocol === 'file:') {
     // Fail loudly rather than bounce the user to Google and back to a page
     // that cannot receive the token. The Android wrapper loads the hosted URL
-    // for exactly this reason.
+    // for exactly this reason, so it never hits this branch.
     alert('Cloud sync needs the hosted version of Midori. Open the app from its web address rather than a local file, then sign in.');
     return;
   }
+
+  // In the wrapper the token must return via the deep-link bridge page; on the
+  // web it returns to this page and lands in the URL fragment.
+  const redirectTo = isAndroidWrapper() ? getAndroidAuthCallbackUrl() : getAuthRedirectTarget();
   const url = `${SUPABASE_URL}/auth/v1/authorize`
     + `?provider=google`
-    + `&redirect_to=${encodeURIComponent(getAuthRedirectTarget())}`;
+    + `&redirect_to=${encodeURIComponent(redirectTo)}`;
+
+  // On the web this navigates the page to Supabase. In the wrapper the native
+  // WebViewClient recognises this exact authorize URL and diverts it into a
+  // Custom Tab instead, because Google refuses OAuth inside a WebView.
   window.location.href = url;
 }
 
@@ -101,33 +134,26 @@ function signOutFromSupabase() {
 }
 
 /**
- * Reads the tokens Supabase appends to the URL fragment after Google sign-in.
- * Must run on every page load, before anything asks for a token.
+ * Parses one OAuth result fragment ("access_token=...&refresh_token=...&..."
+ * or "error=...&error_description=...") and stores the session on success.
  *
- * The fragment is used rather than a query string on purpose: browsers never
- * transmit it to the server, so the access token stays out of server logs and
- * out of the Referer header. It is stripped from the address bar immediately
- * below so it cannot linger in history or be copy-pasted out of the URL.
- *
- * Returns true if a session was captured on this load.
+ * Shared by the web path (fragment in this page's URL) and the Android path
+ * (fragment delivered by MainActivity from the deep link). Returns true only
+ * when a usable session was written.
  */
-function captureSupabaseAuthRedirect() {
-  const hash = window.location.hash;
-  if (!hash || hash.indexOf('access_token=') === -1) {
-    // Supabase reports failures the same way, in the fragment. Ignoring them
-    // silently would leave the user staring at a sign-in button that appears
-    // to do nothing at all.
-    if (hash && hash.indexOf('error=') !== -1) {
-      const errParams = new URLSearchParams(hash.substring(1));
-      const description = errParams.get('error_description') || errParams.get('error');
-      console.error('Supabase sign-in failed:', description);
-      alert('Sign-in failed: ' + (description || 'unknown error'));
-      history.replaceState(null, '', getAuthRedirectTarget());
-    }
+function applyAuthFragment(fragment) {
+  if (!fragment) return false;
+  const params = new URLSearchParams(fragment);
+
+  if (params.get('error') || params.get('error_description')) {
+    // Supabase reports failures the same way. Surfacing it beats leaving the
+    // user staring at a sign-in button that appears to do nothing.
+    const description = params.get('error_description') || params.get('error');
+    console.error('Supabase sign-in failed:', description);
+    alert('Sign-in failed: ' + (description || 'unknown error'));
     return false;
   }
 
-  const params = new URLSearchParams(hash.substring(1));
   const accessToken = params.get('access_token');
   const refreshToken = params.get('refresh_token');
   if (!accessToken || !refreshToken) return false;
@@ -141,10 +167,56 @@ function captureSupabaseAuthRedirect() {
     refresh_token: refreshToken,
     expires_at: Date.now() + expiresInSeconds * 1000
   });
-
-  history.replaceState(null, '', getAuthRedirectTarget());
   return true;
 }
+
+/**
+ * Reads the tokens Supabase appends to the URL fragment after Google sign-in.
+ * Must run on every page load, before anything asks for a token. This is the
+ * WEB path; the Android wrapper never lands tokens in this page's URL (they
+ * arrive via the deep link into __midoriHandleAuthFragment below).
+ *
+ * The fragment is used rather than a query string on purpose: browsers never
+ * transmit it to the server, so the access token stays out of server logs and
+ * out of the Referer header. It is stripped from the address bar immediately
+ * afterwards so it cannot linger in history or be copy-pasted out of the URL.
+ *
+ * Returns true if a session was captured on this load.
+ */
+function captureSupabaseAuthRedirect() {
+  const hash = window.location.hash;
+  if (!hash) return false;
+
+  const hasTokens = hash.indexOf('access_token=') !== -1;
+  const hasError = hash.indexOf('error=') !== -1;
+  if (!hasTokens && !hasError) return false;
+
+  const applied = applyAuthFragment(hash.substring(1));
+  // Strip the fragment either way, so a failed attempt's error params also
+  // leave the address bar. Uses the page URL, never the deep-link target.
+  history.replaceState(null, '', getAuthRedirectTarget());
+  return applied;
+}
+
+/**
+ * Android entry point. MainActivity calls this via evaluateJavascript after the
+ * Custom Tab auth flow returns through the com.midori.ledger:// deep link,
+ * passing the raw fragment it carried. This is native -> JS one-way injection;
+ * there is no JavaScript interface exposed back to the WebView.
+ */
+window.__midoriHandleAuthFragment = function (fragment) {
+  const applied = applyAuthFragment(fragment);
+  if (typeof renderCloudAccountUI === 'function') renderCloudAccountUI();
+  // If sync was already on (a returning user re-authenticating), pull straight
+  // away so the ledger refreshes without waiting for the next poll.
+  if (applied
+      && typeof MidoriState !== 'undefined'
+      && MidoriState.preferences.syncEnabled
+      && typeof pullStateFromCloud === 'function') {
+    pullStateFromCloud();
+  }
+  return applied;
+};
 
 async function refreshSupabaseSession(session) {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {

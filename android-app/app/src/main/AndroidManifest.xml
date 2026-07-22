@@ -24,13 +24,33 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.NoActionBar">
         
+        <!--
+            launchMode=singleTask so the Google-sign-in deep link is delivered
+            to the running activity (onNewIntent), reusing the WebView that holds
+            the ledger, instead of spawning a second copy with empty state.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                Auth return channel. The sign-in Custom Tab finishes on the
+                auth-callback.html bridge page, which redirects to
+                com.midori.ledger://auth#<tokens>; this filter routes that back
+                into the app. The scheme is app-private, so Supabase never needs
+                it in its Redirect URLs — only the https bridge page.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.midori.ledger" android:host="auth" />
             </intent-filter>
         </activity>
     </application>
