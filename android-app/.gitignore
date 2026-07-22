@@ -1,0 +1,23 @@
+# Built application files
+/app/build/
+/build/
+
+# Gradle caches / daemon state
+.gradle/
+
+# Machine-specific SDK location (points at this computer's Android SDK)
+local.properties
+
+# Android Studio / IntelliJ project files
+/.idea/
+*.iml
+
+# The Gradle wrapper is intentionally NOT committed: Android Studio generated
+# it pinned to a pre-release Gradle (9.0-milestone-1) that AGP 8.2.2 rejects.
+# Build with a stable Gradle 8.x instead (see android-app README/build notes).
+/gradle/
+/gradlew
+/gradlew.bat
+
+# OS cruft
+.DS_Store
