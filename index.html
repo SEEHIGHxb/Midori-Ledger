@@ -282,6 +282,15 @@
             </div>
           </div>
         </div>
+
+        <!-- Projected balance — on-device cash-flow forecast (js/ml-forecast.js) -->
+        <div class="chart-card" style="margin-top: 24px;">
+          <h3>Projected Balance <span style="font-size:11px; font-weight:500; opacity:0.6;">(Next 30 Days · estimate, not financial advice)</span></h3>
+          <div id="balanceProjectionEmpty" class="metric-desc" style="display:none; padding:10px 0;"></div>
+          <div style="position: relative; height: 260px;">
+            <canvas id="balanceProjectionChart"></canvas>
+          </div>
+        </div>
       </div>
 
       <!-- ==========================================================================
@@ -1220,6 +1229,11 @@
   <script src="js/supabase-sync.js"></script>
   <script src="js/state.js"></script>
   <script src="js/scheduler.js"></script>
+  <!-- Forecasting: features/audit/synthetic-data before the model, both after
+       scheduler (ml-forecast reuses get30DayForecast) and before dashboard.js
+       (which renders the projection). -->
+  <script src="js/ml-features.js"></script>
+  <script src="js/ml-forecast.js"></script>
   <script src="js/charts.js"></script>
 
   <!-- UI Controllers (split from former monolithic app.js) -->

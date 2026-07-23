@@ -70,6 +70,9 @@ function renderDashboardMetrics() {
 
   // 5. Render 30-Day Schedules Forecast on Dashboard
   renderDashboardForecast();
+
+  // 6. Render the on-device projected-balance chart (js/ml-forecast.js)
+  renderBalanceProjection();
 }
 // Render Dashboard Budget Alerts
 function renderDashboardBudgetAlerts(month, year, baseCurrency) {
@@ -181,6 +184,121 @@ function renderDashboardForecast() {
       </div>
     `;
     container.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+// Chart.js instance for the projected-balance line. Held at module scope so each
+// re-render destroys the previous chart before drawing (the same pattern the
+// charts in charts.js use) instead of stacking canvases.
+let balanceProjectionChartInstance = null;
+
+// Draw the on-device cash-flow projection (js/ml-forecast.js) as a balance line
+// with an uncertainty band. When there is too little history the model returns
+// no points, so the canvas is hidden and a "keep logging" hint shown instead —
+// a confident-looking flat line on two data points would be worse than nothing.
+function renderBalanceProjection() {
+  const canvas = document.getElementById('balanceProjectionChart');
+  if (!canvas) return;
+  const emptyMsg = document.getElementById('balanceProjectionEmpty');
+  const baseCurrency = MidoriState.preferences.baseCurrency;
+  const projection = projectBalance(30);
+
+  const insufficient = projection.sufficiency === 'none' || projection.points.length === 0;
+  if (insufficient || typeof Chart === 'undefined') {
+    canvas.style.display = 'none';
+    if (emptyMsg) {
+      emptyMsg.style.display = 'block';
+      emptyMsg.textContent =
+        'Log a few weeks of day-to-day expenses and a projected balance will appear here.';
+    }
+    if (balanceProjectionChartInstance) {
+      balanceProjectionChartInstance.destroy();
+      balanceProjectionChartInstance = null;
+    }
+    return;
+  }
+
+  if (emptyMsg) emptyMsg.style.display = 'none';
+  canvas.style.display = 'block';
+
+  const colors = getThemeColors();
+  const labels = projection.points.map((p) =>
+    new Date(p.date + 'T00:00:00Z').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  );
+
+  if (balanceProjectionChartInstance) balanceProjectionChartInstance.destroy();
+  balanceProjectionChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        // Upper/lower bounds render first as a shaded band (upper fills down to
+        // lower); only the central line carries a legend entry and tooltip.
+        {
+          label: 'Upper',
+          data: projection.points.map((p) => p.upper),
+          borderColor: 'transparent',
+          backgroundColor: colors.incomeGrad,
+          fill: '+1',
+          pointRadius: 0,
+          tension: 0.3,
+        },
+        {
+          label: 'Lower',
+          data: projection.points.map((p) => p.lower),
+          borderColor: 'transparent',
+          backgroundColor: 'transparent',
+          fill: false,
+          pointRadius: 0,
+          tension: 0.3,
+        },
+        {
+          label: `Projected balance (${baseCurrency})`,
+          data: projection.points.map((p) => p.balance),
+          borderColor: colors.incomeColor,
+          backgroundColor: 'transparent',
+          borderWidth: 3,
+          pointRadius: 0,
+          tension: 0.3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: colors.text,
+            font: { family: 'Outfit, sans-serif', size: 12 },
+            filter: (item) => item.text.indexOf('Projected') === 0,
+          },
+        },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          filter: (item) => item.dataset.label.indexOf('Projected') === 0,
+          callbacks: {
+            label: (ctx) => ` ${formatCurrency(ctx.raw, baseCurrency)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: colors.grid },
+          ticks: { color: colors.text, maxTicksLimit: 8, font: { family: 'Outfit, sans-serif' } },
+        },
+        y: {
+          grid: { color: colors.grid },
+          ticks: {
+            color: colors.text,
+            font: { family: 'Outfit, sans-serif' },
+            callback: (value) => CURRENCIES[baseCurrency].symbol + Number(value).toLocaleString(),
+          },
+        },
+      },
+    },
   });
 }
 

@@ -66,10 +66,17 @@ function createSandbox() {
   const mergeSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'merge.js'), 'utf8');
   const stateSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'state.js'), 'utf8');
   const schedulerSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'scheduler.js'), 'utf8');
+  // Loaded in the same order index.html does: ml-features before ml-forecast
+  // (which calls its helpers), and both after scheduler (ml-forecast reuses
+  // get30DayForecast).
+  const mlFeaturesSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'ml-features.js'), 'utf8');
+  const mlForecastSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'ml-forecast.js'), 'utf8');
 
   vm.runInContext(mergeSrc, sandbox, { filename: 'merge.js' });
   vm.runInContext(stateSrc, sandbox, { filename: 'state.js' });
   vm.runInContext(schedulerSrc, sandbox, { filename: 'scheduler.js' });
+  vm.runInContext(mlFeaturesSrc, sandbox, { filename: 'ml-features.js' });
+  vm.runInContext(mlForecastSrc, sandbox, { filename: 'ml-forecast.js' });
 
   // state.js declares `MidoriState`/`CURRENCIES` with let/const, so they are
   // not properties of the sandbox object — expose tiny accessors (themselves

@@ -238,16 +238,22 @@ function resetToRealDate() {
 }
 
 // Forecast future schedules for the next 30 days
-function get30DayForecast() {
+// Expand active schedules into concrete dated occurrences over the next `days`
+// days from the virtual date. Named for its original 30-day dashboard use, but
+// the horizon is now a parameter so the balance-projection model can ask for 60
+// or 90 days without a second copy of this loop. Every caller that passed no
+// argument still gets the original 30-day window.
+function get30DayForecast(days = 30) {
   const forecast = {
     totalIncome: 0,
     totalExpense: 0,
     events: []
   };
 
+  const horizonDays = Number.isFinite(days) && days > 0 ? Math.floor(days) : 30;
   const virtualDateStr = MidoriState.virtualDate;
   const endLimitDate = new Date(virtualDateStr);
-  endLimitDate.setDate(endLimitDate.getDate() + 30);
+  endLimitDate.setDate(endLimitDate.getDate() + horizonDays);
   const endLimitStr = endLimitDate.toISOString().split('T')[0];
 
   MidoriState.schedules.forEach(schedule => {

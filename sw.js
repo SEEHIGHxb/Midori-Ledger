@@ -3,7 +3,7 @@
  * sw.js: Service Worker for complete offline capabilities
  */
 
-const CACHE_NAME = 'midori-cache-v25';
+const CACHE_NAME = 'midori-cache-v26';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -17,6 +17,8 @@ const ASSETS_TO_CACHE = [
   './js/merge.js',
   './js/state.js',
   './js/scheduler.js',
+  './js/ml-features.js',
+  './js/ml-forecast.js',
   './js/charts.js',
   './js/dashboard.js',
   './js/wallets.js',
