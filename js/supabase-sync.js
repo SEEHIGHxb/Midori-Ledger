@@ -60,6 +60,52 @@ function isSignedInToSupabase() {
 }
 
 /**
+ * Decodes the payload of a Supabase access token (a JWT) WITHOUT verifying its
+ * signature. That is intentional and safe here: the token is one this device
+ * received from Supabase and stored itself, and it is only read to pull out the
+ * stable per-account identifier below. It is never used as a trust decision —
+ * the server re-verifies the signature on every request, so a forged token
+ * would simply be rejected there.
+ */
+function decodeJwtPayload(token) {
+  if (typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return JSON.parse(atob(b64));
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * The signed-in user's stable Supabase id (the JWT `sub`, a UUID). Identical on
+ * every device the same Google account signs into, which is exactly why sync no
+ * longer needs a separately-shared pairing key: this id is what both devices
+ * derive their encryption key from (see deriveSyncCredentialsFromUserId in
+ * state.js). Returns null when signed out or the token is unreadable.
+ */
+function getSupabaseUserId() {
+  const session = readSupabaseSession();
+  if (!session) return null;
+  const payload = decodeJwtPayload(session.access_token);
+  return (payload && payload.sub) ? payload.sub : null;
+}
+
+/**
+ * The signed-in user's email, for display only ("Signed in as …"). Null if the
+ * token carries no email claim or the user is signed out.
+ */
+function getSupabaseUserEmail() {
+  const session = readSupabaseSession();
+  if (!session) return null;
+  const payload = decodeJwtPayload(session.access_token);
+  return (payload && payload.email) ? payload.email : null;
+}
+
+/**
  * Where Google should send the browser back to. Explicitly origin + pathname
  * with no query or hash: reusing location.href would append a second copy of
  * the OAuth fragment on every repeat sign-in, and Supabase requires an exact
@@ -206,9 +252,13 @@ function captureSupabaseAuthRedirect() {
  */
 window.__midoriHandleAuthFragment = function (fragment) {
   const applied = applyAuthFragment(fragment);
+  // Signing in is now all it takes to sync: derive this account's encryption
+  // credentials and turn sync on, then pull. Without this the tokens would be
+  // stored but sync would stay dormant until the next reload.
+  if (applied && typeof activateSyncForCurrentUser === 'function') {
+    activateSyncForCurrentUser();
+  }
   if (typeof renderCloudAccountUI === 'function') renderCloudAccountUI();
-  // If sync was already on (a returning user re-authenticating), pull straight
-  // away so the ledger refreshes without waiting for the next poll.
   if (applied
       && typeof MidoriState !== 'undefined'
       && MidoriState.preferences.syncEnabled

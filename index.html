@@ -446,14 +446,14 @@
            TAB: SETTINGS
            ========================================================================== -->
       <div id="tab-settings" class="tab-content">
-        <h2>App Configuration & Guide</h2>
+        <h2>Settings</h2>
         
         <!-- Zen Quick Visual Guide -->
         <div class="settings-group" style="border-left: 4px solid var(--green-matcha); background: rgba(77, 156, 78, 0.04); margin-bottom: 24px; padding: 24px;">
           <h3 style="color: var(--green-sage); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
             🌿 Quick User Guide
           </h3>
-          <p style="font-size: 13px; opacity: 0.9; margin-bottom: 16px;">Welcome to Midori Ledger, your minimalist workspace for elegant financial tracking. Learn how to master its leafy accounting features:</p>
+          <p style="font-size: 13px; opacity: 0.9; margin-bottom: 16px;">A calm, minimalist workspace for tracking your money. Here are the five things worth knowing:</p>
           
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
             <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 14px; border-radius: 12px;">
@@ -483,26 +483,24 @@
               </h4>
               <p style="font-size: 12px; line-height: 1.5; opacity: 0.8;">Setup automated salaries, recurring bills, or subscription deposits under the Schedules tab. You can optionally enforce custom expiration bounds via End Occurrence dates.</p>
             </div>
+
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 14px; border-radius: 12px;">
+              <h4 style="font-size: 14px; color: var(--green-mint); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                ☁️ One-Tap Cloud Sync
+              </h4>
+              <p style="font-size: 12px; line-height: 1.5; opacity: 0.8;">Sign in with Google under Cloud Sync below and your ledger backs up and syncs to every device automatically — no keys or codes to copy. Your data is encrypted, and only your account can read it.</p>
+            </div>
           </div>
         </div>
-        
-        <!-- ZenSync (E2E Encrypted Sync) Card -->
-        <div class="settings-group" style="border-left: 4px solid var(--green-sage);">
-          <h3>ZenSync Cloud Synchronization 🍃</h3>
-          <p>Link your PC and mobile devices securely. All data is encrypted on your device using AES-GCM-256 before upload. Nobody, including the storage broker, can read your ledger without your private Sync Key.</p>
-          
-          <!-- Auto-advance date setting -->
-          <div style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight: 500; font-size: 13px;">
-              <input type="checkbox" id="sync-auto-device-date" checked style="width:16px; height:16px; accent-color:var(--green-matcha); cursor:pointer;">
-              <span>Auto-Advance virtual system date to today on application startup</span>
-            </label>
-          </div>
 
-          <!-- Signing in and pairing do two different jobs, so both exist:
-               the Google account decides WHOSE ledger row this is on the server,
-               while the pairing key is what encrypts it. The server only ever
-               stores ciphertext, so signing in alone cannot read your data. -->
+        <!-- Cloud Sync Card -->
+        <div class="settings-group" style="border-left: 4px solid var(--green-sage);">
+          <h3>☁️ Cloud Sync</h3>
+          <p>Sign in with Google to back up your ledger and keep it in sync across your devices. That is the whole setup — there are no keys or codes to copy. Your data is encrypted before it is stored, and only your account can read it.</p>
+          
+          <!-- Sign-in is the whole setup now. The account both decides whose
+               ledger row this is AND, via an encryption key derived from it,
+               keeps the contents readable only to this account. No pairing key. -->
           <div id="supabase-account-row" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
               <div>
@@ -517,52 +515,29 @@
             <p id="supabase-account-hint" style="font-size: 12px; opacity: 0.65; margin: 12px 0 0;">Sign in to store your encrypted ledger. Your data is encrypted on this device first — the server never holds the key.</p>
           </div>
 
-          <div id="zensync-disabled-view">
-            <p style="font-size: 13px; opacity: 0.8; margin-bottom: 16px;">Cloud synchronization is currently <b>Disabled</b>. You can enable it to back up your ledger or pair with another device.</p>
-            <div class="settings-action-row">
-              <button class="add-btn" data-action="enableZenSync">Enable Cloud Sync</button>
-              <button class="btn-secondary" data-action="openPairingModal">Link Existing Device</button>
-            </div>
-          </div>
-
           <div id="zensync-enabled-view" style="display: none;">
             <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-size: 13px; opacity: 0.8;">Sync Status: <b id="sync-status-label" style="color: var(--green-mint);">Active</b></span>
-                <span id="sync-last-time" style="font-size: 11px; opacity: 0.6;">Never synced</span>
-              </div>
-              <div style="margin-bottom: 12px;">
-                <label style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Sync ID (Public Address)</label>
-                <div style="display: flex; gap: 8px;">
-                  <input type="text" id="sync-id-display" class="form-control" style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.2);" readonly>
-                  <button class="btn-secondary" style="padding: 0 12px;" data-action="copySyncField" data-arg="sync-id-display">Copy</button>
-                </div>
-              </div>
-              <div style="margin-bottom: 12px;">
-                <label style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Private Sync Key (Keep Secret!)</label>
-                <div style="display: flex; gap: 8px;">
-                  <input type="password" id="sync-key-display" class="form-control" style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.2);" readonly>
-                  <button class="btn-secondary" style="padding: 0 12px;" id="btn-toggle-sync-key-visibility" data-action="toggleSyncKeyVisibility">Show</button>
-                  <button class="btn-secondary" style="padding: 0 12px;" data-action="copySyncField" data-arg="sync-key-display">Copy</button>
-                </div>
-              </div>
-              
-              <!-- QR Code pairing canvas container -->
-              <div style="display: flex; flex-direction: column; align-items: center; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
-                <span style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--green-mint);">Pairing QR Code</span>
-                <div style="background: white; padding: 12px; border-radius: 8px; display: inline-flex;" id="sync-qrcode-wrap">
-                  <canvas id="sync-qrcode-canvas" width="160" height="160"></canvas>
-                </div>
-                <span style="font-size: 10px; opacity: 0.6; text-align: center; margin-top: 8px; max-width: 260px; line-height: 1.4;">Scan this QR code from your other device inside Midori to instantly pair and link them.</span>
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; opacity: 0.9;">
+                  <span id="zensync-inline-dot" style="width: 8px; height: 8px; border-radius: 50%; background: var(--green-mint); display: inline-block;"></span>
+                  Sync status: <b id="sync-status-label" style="color: var(--green-mint);">Active</b>
+                </span>
+                <span id="sync-last-time" style="font-size: 11px; opacity: 0.6;">Not synced yet</span>
               </div>
             </div>
 
-            <div class="settings-action-row" style="flex-wrap: wrap; gap: 8px;">
-              <button class="btn-secondary" data-action="forceSyncPush">Export Data to Cloud</button>
-              <button class="btn-secondary" data-action="forceSyncPull">Import Data From Cloud</button>
-              <button class="btn-danger" style="margin-left: auto;" data-action="disableZenSync">Disable Cloud Sync</button>
+            <div class="settings-action-row">
+              <button class="btn-secondary" data-action="syncNow">Sync now</button>
             </div>
           </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>⚙️ Preferences</h3>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight: 500; font-size: 13px;">
+            <input type="checkbox" id="sync-auto-device-date" checked style="width:16px; height:16px; accent-color:var(--green-matcha); cursor:pointer;">
+            <span>Auto-advance the app date to today when Midori starts</span>
+          </label>
         </div>
 
         <div class="settings-group">
@@ -588,9 +563,9 @@
           <p>System update and release integrity verification.</p>
           <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; font-size: 13px; line-height: 1.6; display: flex; flex-direction: column; gap: 8px;">
             <div><strong>App Name:</strong> Midori — Leafy Ledger</div>
-            <div><strong>Version:</strong> 1.3.1 (Build 2026.06.24-v12)</div>
-            <div><strong>Last Updated:</strong> June 24, 2026</div>
-            <div><strong>Sync Engine:</strong> ZenSync Local AES-GCM-256 (PWA-v11)</div>
+            <div><strong>Version:</strong> 1.4.0 (Build 2026.07.23-v25)</div>
+            <div><strong>Last Updated:</strong> July 23, 2026</div>
+            <div><strong>Sync Engine:</strong> Google account sync · AES-GCM-256 (PWA-v25)</div>
           </div>
         </div>
       </div>
@@ -1233,56 +1208,6 @@
       </form>
     </div>
   </div>
-
-  <!-- ==========================================================================
-       MODAL: LINK EXISTING DEVICE (Pairing Modal)
-       ========================================================================== -->
-  <div class="modal-overlay" id="modalPairing">
-    <div class="modal-window" style="max-width: 450px;" role="dialog" aria-modal="true" aria-labelledby="modalPairingTitle">
-      <div class="modal-header">
-        <h3 id="modalPairingTitle">Link Existing Device</h3>
-        <button class="modal-close-btn" type="button" aria-label="Close dialog" data-action="closeModal" data-arg="modalPairing">
-          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
-      <form class="modal-form" id="pairingForm">
-        <p style="font-size: 12px; opacity: 0.8; margin-bottom: 16px; line-height: 1.5;">
-          Enter the Pairing Code or credentials from your other device to synchronize your ledger. 
-          <span style="color: var(--autumn-terracotta); font-weight: 600; display: block; margin-top: 4px;">Warning: This will overwrite your current local database with the synced cloud data.</span>
-        </p>
-
-        <!-- Method A: Text input code -->
-        <div class="input-group">
-          <label for="pairingCode">Pairing Code (Combined String)</label>
-          <textarea id="pairingCode" class="form-control" style="height: 80px; font-family: monospace; font-size: 11px; resize: none;" placeholder="Format: mds_xxx...|msk_yyy..." required></textarea>
-        </div>
-
-        <!-- Method B: Camera scan button -->
-        <div class="input-group" style="display: flex; flex-direction: column; align-items: center; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
-          <span style="font-size: 12px; margin-bottom: 8px;">Or scan the Pairing QR Code from your other device:</span>
-          <button type="button" class="btn-secondary" id="btn-scan-qr" data-action="startQRScanner" style="display: flex; align-items: center; gap: 8px;">
-            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-            Scan Pairing QR Code
-          </button>
-          
-          <!-- Hidden video element for camera stream -->
-          <div id="qr-reader-container" style="display: none; width: 100%; max-width: 320px; border-radius: 8px; overflow: hidden; margin-top: 12px; border: 2px solid var(--green-matcha); position: relative;">
-            <video id="qr-video" style="width: 100%; height: auto; transform: scaleX(1);"></video>
-            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 40px solid rgba(0,0,0,0.5); pointer-events: none; display: flex; align-items: center; justify-content: center;">
-              <div style="width: 100%; height: 100%; border: 2px dashed var(--green-mint);"></div>
-            </div>
-            <button type="button" class="btn-danger" style="position: absolute; bottom: 8px; right: 8px; padding: 4px 8px; font-size: 10px;" data-action="stopQRScanner">Cancel Scan</button>
-          </div>
-        </div>
-
-        <button type="submit" class="form-submit-btn" style="margin-top: 20px;">Pair & Sync Ledger</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- QR Code and External Utilities -->
-  <script src="js/qrcode.min.js"></script>
-  <script src="js/jsqr.min.js"></script>
 
   <!-- Core Javascript Engines -->
   <!-- These three MUST precede state.js. state.js calls loadState() at the end

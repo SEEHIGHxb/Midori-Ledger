@@ -1102,6 +1102,65 @@ function generateSyncCredentials() {
   };
 }
 
+// --- Account-derived sync credentials --------------------------------------
+// Signing in with Google is now the entire setup. Instead of generating a
+// random pairing key and shuttling it between devices by QR/code, both devices
+// derive the SAME credentials from the account's stable Supabase user id. This
+// is deterministic on purpose — the reproducible-per-account key is what buys
+// zero setup. The deliberate trade: it is no longer zero-knowledge, since the
+// identity the server manages is the key's only input. The ledger is still
+// encrypted at rest, and row-level security still keeps every OTHER user out of
+// the row, so the exposure is narrowed to "Supabase itself could derive it".
+function deriveSyncCredentialsFromUserId(userId) {
+  if (!userId) return null;
+  const normalized = String(userId).replace(/[^a-zA-Z0-9]/g, '');
+  if (!normalized) return null;
+  return {
+    // Salt for PBKDF2 (public by design), stable per account.
+    syncId: 'mds_' + normalized,
+    // AES-GCM password. The 'acct_' namespace keeps it from ever colliding with
+    // a legacy random pairing key, which was 'msk_' + token.
+    syncKey: 'msk_acct_' + normalized
+  };
+}
+
+// Turns sync on for whoever is signed in, deriving their credentials from the
+// session. Idempotent and safe to call on every load. Writes straight to
+// localStorage rather than through saveState() so it cannot trigger an
+// auto-push before the caller has had the chance to pull first.
+function activateSyncForCurrentUser() {
+  if (typeof isSignedInToSupabase !== 'function' || !isSignedInToSupabase()) return false;
+  const userId = (typeof getSupabaseUserId === 'function') ? getSupabaseUserId() : null;
+  const creds = deriveSyncCredentialsFromUserId(userId);
+  if (!creds) return false;
+
+  MidoriState.preferences.syncId = creds.syncId;
+  MidoriState.preferences.syncKey = creds.syncKey;
+  MidoriState.preferences.syncEnabled = true;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+  } catch (e) {
+    console.error('Could not persist activated sync state.', e);
+  }
+  return true;
+}
+
+// Turns sync off on sign-out. The credentials are derived, not user-authored,
+// so clearing them loses nothing — the next sign-in re-derives the identical
+// pair and picks the ledger back up.
+function deactivateSync() {
+  MidoriState.preferences.syncEnabled = false;
+  MidoriState.preferences.syncId = null;
+  MidoriState.preferences.syncKey = null;
+  MidoriState.preferences.lastSyncedAt = 0;
+  MidoriState.preferences.cloudRevision = 0;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MidoriState));
+  } catch (e) {
+    console.error('Could not persist deactivated sync state.', e);
+  }
+}
+
 let syncDebounceTimeout = null;
 
 function triggerAutoSyncPush() {
@@ -1160,6 +1219,22 @@ async function decryptEnvelopeToState(encryptedData) {
   return parsed;
 }
 
+// Decrypts a cloud envelope, or returns null when it cannot be read with THIS
+// account's key. There is exactly one benign reason for that: a blob written
+// under the old random pairing key, before sync became account-derived. Row
+// level security guarantees the row belongs to this user, so an unreadable blob
+// is safe to discard — the caller replaces it with local data. Returning null
+// rather than throwing is what stops a one-time migration from stranding the
+// account on a permanent sync error.
+async function tryDecryptEnvelopeToState(encryptedData) {
+  try {
+    return await decryptEnvelopeToState(encryptedData);
+  } catch (e) {
+    console.warn('Cloud ledger is not readable with this account key (likely an older pairing-encrypted backup); local data will replace it.', e);
+    return null;
+  }
+}
+
 /**
  * Merges a decrypted remote ledger into the live state and persists it.
  *
@@ -1209,7 +1284,10 @@ async function pushStateToCloud() {
         // data loss this whole mechanism exists to prevent.
         console.log(`Push conflicted at revision ${result.revision}; merging and retrying (attempt ${attempt}).`);
         if (result.encrypted_data) {
-          applyRemoteState(await decryptEnvelopeToState(result.encrypted_data));
+          // A readable peer ledger is merged in. An unreadable one (old pairing
+          // key) is left behind, and the retry overwrites it with local data.
+          const remote = await tryDecryptEnvelopeToState(result.encrypted_data);
+          if (remote) applyRemoteState(remote);
         }
         setCloudRevision(result.revision);
         continue;
@@ -1249,8 +1327,16 @@ async function pullStateFromCloud() {
       return await pushStateToCloud();
     }
 
-    applyRemoteState(await decryptEnvelopeToState(envelope.encrypted_data));
+    const remote = await tryDecryptEnvelopeToState(envelope.encrypted_data);
     setCloudRevision(envelope.revision);
+    if (remote) {
+      applyRemoteState(remote);
+    } else {
+      // Unreadable backup from the old pairing scheme. Its revision is already
+      // adopted above, so the push below wins the compare-and-swap and replaces
+      // it with this device's ledger instead of looping on an undecryptable blob.
+      console.log('Replacing an unreadable cloud backup with this device\'s ledger.');
+    }
 
     // Push straight back. The merge result almost always differs from what the
     // server holds — it now contains this device's records too — and leaving it

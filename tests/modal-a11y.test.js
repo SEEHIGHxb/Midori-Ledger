@@ -1,5 +1,5 @@
 /**
- * Guards the dialog semantics and keyboard behaviour of the 10 modals.
+ * Guards the dialog semantics and keyboard behaviour of the app's modals.
  *
  * These are static source assertions, in the same spirit as
  * csp-inline-handlers.test.js: the app has no DOM test harness, and the failures
@@ -30,7 +30,7 @@ const STYLE_CSS = stripCssComments(fs.readFileSync(path.join(ROOT, 'css', 'style
 const MODAL_IDS = [...INDEX_HTML.matchAll(/<div class="modal-overlay" id="(\w+)">/g)].map((m) => m[1]);
 
 test('every modal overlay wraps a labelled, modal dialog', () => {
-  assert.ok(MODAL_IDS.length >= 10, `expected the app's modals, found ${MODAL_IDS.length}`);
+  assert.ok(MODAL_IDS.length >= 9, `expected the app's modals, found ${MODAL_IDS.length}`);
 
   const htmlIds = new Set([...INDEX_HTML.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
   const problems = [];
@@ -61,7 +61,7 @@ test('every modal close button has an accessible name', () => {
   // These buttons contain only an <svg>, so without aria-label a screen reader
   // announces an unnamed button. All 10 were unnamed before this was added.
   const buttons = [...INDEX_HTML.matchAll(/<button class="modal-close-btn"([^>]*)>/g)].map((m) => m[1]);
-  assert.ok(buttons.length >= 10, `expected 10 close buttons, found ${buttons.length}`);
+  assert.ok(buttons.length >= 9, `expected 9 close buttons, found ${buttons.length}`);
   const unnamed = buttons.filter((attrs) => !/aria-label="[^"]+"/.test(attrs));
   assert.strictEqual(unnamed.length, 0, `close buttons with no aria-label: ${unnamed.length}`);
 });

@@ -86,13 +86,28 @@ document.addEventListener('DOMContentLoaded', () => {
     captureSupabaseAuthRedirect();
   }
 
+  // 0b. If a Google session is present (a returning user, or one who just came
+  //     back from the sign-in redirect above), derive this account's sync
+  //     credentials and turn sync on. Signing in is the whole setup now, so
+  //     this is what makes the rest of startup treat the user as synced.
+  const isSyncSignedIn = typeof isSignedInToSupabase === 'function' && isSignedInToSupabase();
+  if (isSyncSignedIn && typeof activateSyncForCurrentUser === 'function') {
+    activateSyncForCurrentUser();
+  }
+
   // 1. Initial State Load
   if (MidoriState.wallets.length === 0) {
-    if (MidoriState.preferences.autoSyncDeviceDate) {
-      MidoriState.virtualDate = getDeviceTodayDateStr();
+    if (isSyncSignedIn && MidoriState.preferences.syncEnabled) {
+      // A signed-in user on an empty (new) device: pull their real ledger
+      // rather than seeding sample data that would then merge into it.
+      pullStateFromCloud();
+    } else {
+      if (MidoriState.preferences.autoSyncDeviceDate) {
+        MidoriState.virtualDate = getDeviceTodayDateStr();
+      }
+      // Generate dummy data on a fresh start so the user has something to see.
+      generateMatchaDummyData();
     }
-    // Generate dummy data on absolute fresh start so the user has immediate visual enjoyment
-    generateMatchaDummyData();
   } else {
     // Check auto sync of device date on load
     if (MidoriState.preferences.autoSyncDeviceDate) {
@@ -102,8 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateVirtualDate(todayStr);
       }
     }
-    
-    // ZenSync initial cloud pull on startup
+
+    // Initial cloud pull on startup for a signed-in, synced user.
     if (MidoriState.preferences.syncEnabled) {
       pullStateFromCloud();
     }
@@ -291,20 +306,12 @@ const DATA_ACTION_HANDLERS = {
   resetToCurrentDate: () => resetToCurrentDate(),
   openModal: (arg) => openModal(arg),
   closeModal: (arg) => closeModal(arg),
-  enableZenSync: () => enableZenSync(),
-  disableZenSync: () => disableZenSync(),
   signInToCloud: () => signInToCloud(),
   signOutOfCloud: () => signOutOfCloud(),
-  openPairingModal: () => openPairingModal(),
-  copySyncField: (arg) => copySyncField(arg),
-  toggleSyncKeyVisibility: () => toggleSyncKeyVisibility(),
-  forceSyncPush: () => forceSyncPush(),
-  forceSyncPull: () => forceSyncPull(),
+  syncNow: () => syncNow(),
   triggerStateExport: () => triggerStateExport(),
   clickImportFileInput: () => document.getElementById('importFileInput').click(),
   triggerStateReset: () => triggerStateReset(),
-  startQRScanner: () => startQRScanner(),
-  stopQRScanner: () => stopQRScanner(),
   ledgerPrevPage: () => changeLedgerPage(-1),
   ledgerNextPage: () => changeLedgerPage(1),
   // Row-level actions on dynamically rendered lists. These were inline
@@ -378,7 +385,6 @@ const INLINE_EVENT_BINDINGS = [
   ['editSchedType', 'change', () => syncEditScheduleCategoryOptions()],
 
   ['editBudgetForm', 'submit', (el, event) => submitEditBudgetForm(event)],
-  ['pairingForm', 'submit', (el, event) => submitPairingForm(event)],
 ];
 
 function setupDeclaredHandlers() {
