@@ -13,6 +13,7 @@ let lastDetectedSubscriptions = [];
 
 function renderInsights() {
   renderSubscriptionSuggestions();
+  renderBudgetForecast();
 }
 
 function renderSubscriptionSuggestions() {
@@ -104,4 +105,80 @@ function addDetectedSubscription(key) {
   if (typeof showToast === 'function') {
     showToast(`Added “${c.title}” to your schedules.`);
   }
+}
+
+// --- Budget-overrun forecast (Phase 4) --------------------------------------
+// Per-tier bar styling + human label. Only non-'safe' tiers ever reach the UI.
+const BUDGET_STATUS_UI = {
+  exceeded: { cls: 'status-danger', label: 'Over budget' },
+  projected_over: { cls: 'status-danger', label: 'On track to exceed' },
+  approaching: { cls: 'status-warn', label: 'Approaching limit' },
+};
+
+function renderBudgetForecast() {
+  const container = document.getElementById('budgetForecastContainer');
+  if (!container) return;
+
+  let result = { items: [] };
+  try {
+    result = forecastBudgets();
+  } catch (err) {
+    console.error('[Midori] Budget forecast failed:', err);
+  }
+  container.innerHTML = '';
+
+  const baseCurrency = MidoriState.preferences.baseCurrency;
+
+  if (!result.items.length) {
+    container.innerHTML = `
+      <div class="empty-placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        <span>No monthly category budgets set. Add a monthly limit to a tag on the Budgets tab and Midori will forecast overruns here.</span>
+      </div>
+    `;
+    return;
+  }
+
+  const alerts = result.items.filter((i) => i.status !== 'safe');
+  if (!alerts.length) {
+    const n = result.items.length;
+    container.innerHTML = `<div class="metric-desc" style="padding:10px 0;">All ${n} budgeted ${n === 1 ? 'category is' : 'categories are'} on track for this month. 🌱</div>`;
+    return;
+  }
+
+  const monthEndLabel = escapeHtml(formatDisplayDate(result.monthEnd));
+  alerts.forEach((it) => {
+    const ui = BUDGET_STATUS_UI[it.status];
+    const barPct = Math.min(100, it.projectedPct);
+    const overLine = it.overBy > 0
+      ? `Projected <b>${formatCurrency(it.overBy, baseCurrency)}</b> over by ${monthEndLabel}`
+      : `Projected <b>${it.projectedPct}%</b> of limit by ${monthEndLabel}`;
+
+    const html = `
+      <div style="background:rgba(139,168,143,0.03); border:1px solid var(--border-color); border-radius:12px; padding:12px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px;">
+          <span style="font-weight:600; display:flex; align-items:center; gap:6px;">
+            <span style="width:8px; height:8px; border-radius:50%; background-color:${escapeHtml(it.color || '#8ba88f')};"></span>
+            ${escapeHtml(it.name)}
+          </span>
+          <span style="font-weight:700; font-family:'Outfit';">
+            ${formatCurrency(it.spent, baseCurrency)} / ${formatCurrency(it.budget, baseCurrency)}
+          </span>
+        </div>
+        <div class="budget-progress-bar">
+          <div class="budget-progress-fill ${ui.cls}" style="width:${barPct}%"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--text-muted); margin-top:4px;">
+          <span>${overLine} • ${it.daysLeft} days left</span>
+          <span class="${ui.cls}" style="font-weight:600;">${escapeHtml(ui.label)}</span>
+        </div>
+        <div style="text-align:right; margin-top:8px;">
+          <button class="btn-secondary" data-action="openEditBudgetModal" data-arg="${escapeHtml(it.categoryId)}" style="padding:5px 10px; font-size:11px;">
+            Adjust budget
+          </button>
+        </div>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+  });
 }

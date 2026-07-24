@@ -318,6 +318,16 @@
             <!-- Loaded dynamically -->
           </div>
         </div>
+
+        <div class="chart-card" style="margin-top: 24px;">
+          <h3>Budget forecast <span style="font-size:11px; font-weight:500; opacity:0.6;">(projected month-end overruns)</span></h3>
+          <p class="metric-desc" style="margin: 4px 0 16px; font-size:12px; opacity:0.7;">
+            Where this month's spending is heading — spent so far plus your recent pace and upcoming scheduled charges, against each monthly limit.
+          </p>
+          <div id="budgetForecastContainer">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
       </div>
 
       <!-- ==========================================================================
@@ -1264,6 +1274,8 @@
   <script src="js/ml-forecast.js"></script>
   <!-- Subscription detection: needs ml-features + scheduler helpers, feeds the Insights tab. -->
   <script src="js/ml-subscriptions.js"></script>
+  <!-- Budget-overrun forecast: reuses trainDiscretionaryModel + schedule expansion. -->
+  <script src="js/ml-budget.js"></script>
   <script src="js/charts.js"></script>
 
   <!-- UI Controllers (split from former monolithic app.js) -->

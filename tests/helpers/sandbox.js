@@ -75,6 +75,9 @@ function createSandbox() {
   // ml-subscriptions reuses ml-features helpers + scheduler's getNextOccurrenceDate,
   // so it loads after both — the same order index.html uses.
   const mlSubscriptionsSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'ml-subscriptions.js'), 'utf8');
+  // ml-budget reuses trainDiscretionaryModel/predictDiscretionaryForDay (ml-forecast)
+  // and scheduler's occurrence helpers, so it loads last of the ML group.
+  const mlBudgetSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'ml-budget.js'), 'utf8');
 
   vm.runInContext(mergeSrc, sandbox, { filename: 'merge.js' });
   vm.runInContext(stateSrc, sandbox, { filename: 'state.js' });
@@ -83,6 +86,7 @@ function createSandbox() {
   vm.runInContext(mlCoreSrc, sandbox, { filename: 'ml-core.js' });
   vm.runInContext(mlForecastSrc, sandbox, { filename: 'ml-forecast.js' });
   vm.runInContext(mlSubscriptionsSrc, sandbox, { filename: 'ml-subscriptions.js' });
+  vm.runInContext(mlBudgetSrc, sandbox, { filename: 'ml-budget.js' });
 
   // state.js declares `MidoriState`/`CURRENCIES` with let/const, so they are
   // not properties of the sandbox object — expose tiny accessors (themselves
