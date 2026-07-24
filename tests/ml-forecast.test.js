@@ -30,25 +30,38 @@ test('getCurrentNetWorth sums wallet balances in base currency', () => {
   assert.strictEqual(s.getCurrentNetWorth(), 50000);
 });
 
-test('trainDiscretionaryModel learns weekday seasonality from enough history', () => {
+test('trainDiscretionaryModel selects a model by walk-forward CV on good data', () => {
   const s = createSandbox();
   withSynthetic(s);
   const model = s.trainDiscretionaryModel({});
   assert.strictEqual(model.sufficiency, 'good');
-  assert.strictEqual(model.useSeasonality, true);
-  assert.strictEqual(model.dow.length, 7);
-  assert.ok(model.overall.mean > 0);
-  // The generator makes Fridays (weekday 5) the biggest spend day and Sundays
-  // (weekday 0) the smallest, so the learned weekday means must reflect that.
-  assert.ok(model.dow[5].mean > model.dow[0].mean);
+  assert.ok(['seasonal', 'ridge', 'mlp'].indexOf(model.type) !== -1);
+  assert.ok(model.cv && model.cv.baselineMae > 0);
+  assert.strictEqual(model.cv.winner, model.type);
+  // The chosen model's CV error is never worse than the seasonal baseline; a
+  // learned model only wins by beating it, so this holds for every outcome.
+  const winner = model.cv.results.find((r) => r.name === model.type);
+  assert.ok(winner.mae <= model.cv.baselineMae * 1.0001);
 });
 
-test('predictDiscretionaryForDay returns that day\'s weekday bucket when seasonality is on', () => {
+test('buildSeasonalBaseline captures the weekday spend pattern', () => {
+  const s = createSandbox();
+  const state = withSynthetic(s);
+  const series = s.getDiscretionaryDailySeries(state.transactions, 'THB', state.virtualDate, 90);
+  const baseline = s.buildSeasonalBaseline(series, { sufficiency: 'good' });
+  assert.strictEqual(baseline.type, 'seasonal');
+  assert.strictEqual(baseline.dow.length, 7);
+  // Generator: Fridays (weekday 5) are the biggest spend day, Sundays (0) the smallest.
+  assert.ok(baseline.dow[5].mean > baseline.dow[0].mean);
+});
+
+test('predictDiscretionaryForDay returns a non-negative spend estimate with a spread', () => {
   const s = createSandbox();
   withSynthetic(s);
   const model = s.trainDiscretionaryModel({});
-  const day = '2026-05-22';
-  assert.deepStrictEqual(s.predictDiscretionaryForDay(model, day), model.dow[s.mlDayOfWeek(day)]);
+  const p = s.predictDiscretionaryForDay(model, '2026-05-22');
+  assert.ok(Number.isFinite(p.mean) && p.mean >= 0);
+  assert.ok(Number.isFinite(p.std) && p.std >= 0);
 });
 
 test('projectBalance returns a dense path with a band that widens over time', () => {
@@ -79,4 +92,11 @@ test('projectBalance refuses to guess on an empty ledger', () => {
   const result = s.projectBalance(30);
   assert.strictEqual(result.sufficiency, 'none');
   assert.strictEqual(result.points.length, 0);
+});
+
+test('trainDiscretionaryModel falls back to the seasonal baseline on thin data', () => {
+  const s = createSandbox();
+  withSynthetic(s, { months: 1 }); // ~1 month -> 'minimal', too little for CV model selection
+  const model = s.trainDiscretionaryModel({});
+  assert.strictEqual(model.type, 'seasonal');
 });

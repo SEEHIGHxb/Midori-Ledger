@@ -70,12 +70,14 @@ function createSandbox() {
   // (which calls its helpers), and both after scheduler (ml-forecast reuses
   // get30DayForecast).
   const mlFeaturesSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'ml-features.js'), 'utf8');
+  const mlCoreSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'ml-core.js'), 'utf8');
   const mlForecastSrc = fs.readFileSync(path.join(__dirname, '..', '..', 'js', 'ml-forecast.js'), 'utf8');
 
   vm.runInContext(mergeSrc, sandbox, { filename: 'merge.js' });
   vm.runInContext(stateSrc, sandbox, { filename: 'state.js' });
   vm.runInContext(schedulerSrc, sandbox, { filename: 'scheduler.js' });
   vm.runInContext(mlFeaturesSrc, sandbox, { filename: 'ml-features.js' });
+  vm.runInContext(mlCoreSrc, sandbox, { filename: 'ml-core.js' });
   vm.runInContext(mlForecastSrc, sandbox, { filename: 'ml-forecast.js' });
 
   // state.js declares `MidoriState`/`CURRENCIES` with let/const, so they are

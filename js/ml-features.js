@@ -181,10 +181,18 @@ function generateSyntheticLedger(options) {
   for (let i = 0; i < totalDays; i++) {
     const day = mlAddDays(startStr, i);
     const dow = mlDayOfWeek(day);
-    const trend = 1 + (i / totalDays) * 0.15; // ~15% drift across the window
-    const purchases = 1 + Math.floor(rand() * 3);
+    const dom = new Date(day + 'T00:00:00Z').getUTCDate();
+    const trend = 1 + (i / totalDays) * 0.35; // ~35% lifestyle drift across the window
+    // Payday effect: spending runs higher just after the month turns over and
+    // tightens toward month-end — a day-of-month signal the weekday-average
+    // baseline is blind to, but the model's cyclic day-of-month features (and the
+    // trend term) can exploit, so a learned model can legitimately beat it. The
+    // purchase count is held steady so this structured signal is not swamped by
+    // irreducible count noise no date feature could ever predict.
+    const payday = 1 + 0.5 * Math.cos((2 * Math.PI * (dom - 1)) / 30.44);
+    const purchases = 2;
     for (let p = 0; p < purchases; p++) {
-      const amount = Math.round((150 + rand() * 450) * dowMultiplier[dow] * trend);
+      const amount = Math.round((250 + rand() * 120) * dowMultiplier[dow] * trend * payday);
       transactions.push({
         id: 'tx_syn_' + counter++,
         title: 'Purchase',

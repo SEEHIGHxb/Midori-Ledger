@@ -42,43 +42,145 @@ function getCurrentNetWorth() {
   );
 }
 
-// "Train" the discretionary model. For the Phase 1 baseline this fits a mean and
-// spread of daily spend over the lookback window, plus a per-weekday mean/std
-// when there is enough history to estimate seasonality (sufficiency 'good').
-// The returned object is the model's parameters — the same shape a learned model
-// will produce so predictDiscretionaryForDay() never has to change.
+// Feature vector for a calendar date: a weekday one-hot (which lets even a linear
+// model learn an arbitrary per-weekday level, so ridge strictly subsumes the
+// seasonal baseline), a trend term in months since the training anchor (it
+// extrapolates cleanly into the forecast horizon), and a cyclic day-of-month
+// pair for within-month structure. Everything a future date needs is derivable
+// from the date alone — no lag features, which would require recursively feeding
+// predictions back and compounding error over the horizon.
+function mlDateFeatures(dateStr, anchorDateStr) {
+  const feat = new Array(7).fill(0);
+  feat[mlDayOfWeek(dateStr)] = 1;
+  const trend = mlDaysBetween(anchorDateStr, dateStr) / 30;
+  const dom = new Date(String(dateStr).slice(0, 10) + 'T00:00:00Z').getUTCDate();
+  feat.push(trend, Math.sin((2 * Math.PI * dom) / 30.44), Math.cos((2 * Math.PI * dom) / 30.44));
+  return feat;
+}
+
+// Seasonal-mean baseline (the Phase 1 model): per-weekday mean/std with a flat
+// overall fallback for weekdays with too few samples. It is both the low-data
+// model and the benchmark every learned model has to beat.
+function buildSeasonalBaseline(series, audit) {
+  const overall = meanStd(series.map((d) => d.amount));
+  const byDow = Array.from({ length: 7 }, () => []);
+  series.forEach((d) => byDow[mlDayOfWeek(d.date)].push(d.amount));
+  const dow = byDow.map((vals) => (vals.length >= 3 ? meanStd(vals) : overall));
+  return {
+    type: 'seasonal',
+    overall,
+    dow,
+    useSeasonality: audit.sufficiency === ML_SUFFICIENCY.GOOD,
+    sufficiency: audit.sufficiency,
+    trainedDays: series.length,
+  };
+}
+
+// The three competing estimators, each a {name, train, predict}. seasonal is the
+// per-weekday mean; ridge and mlp come from ml-core. Keeping them behind a
+// uniform interface lets selectDiscretionaryModel score them all in one CV loop.
+function makeDiscretionaryCandidates(seed) {
+  return [
+    {
+      name: 'seasonal',
+      train: (Xtr, ytr, dowTr) => {
+        const byDow = Array.from({ length: 7 }, () => []);
+        ytr.forEach((v, i) => byDow[dowTr[i]].push(v));
+        const overall = meanStd(ytr).mean;
+        return { means: byDow.map((vals) => (vals.length ? meanStd(vals).mean : overall)), overall };
+      },
+      predict: (m, x, dow) => (m.means[dow] != null ? m.means[dow] : m.overall),
+    },
+    { name: 'ridge', train: (Xtr, ytr) => mlTrainRidge(Xtr, ytr), predict: (m, x) => mlPredictRidge(m, x) },
+    { name: 'mlp', train: (Xtr, ytr) => mlTrainMLP(Xtr, ytr, { seed }), predict: (m, x) => mlPredictMLP(m, x) },
+  ];
+}
+
+// Fit and pick the discretionary-spend model by walk-forward cross-validation.
+// A learned model is only chosen when it beats the seasonal baseline's CV error
+// by a clear margin (1%); otherwise the simpler, more robust baseline wins — the
+// fancy model does not get to win by a rounding error. The returned object
+// carries a `cv` report so the UI can show accuracy vs the baseline.
+function selectDiscretionaryModel(series, options) {
+  const opts = options || {};
+  const seed = opts.seed != null ? opts.seed : 12345;
+  const anchorDate = series[0].date;
+  const X = series.map((d) => mlDateFeatures(d.date, anchorDate));
+  const y = series.map((d) => d.amount);
+  const dow = series.map((d) => mlDayOfWeek(d.date));
+
+  const splits = mlExpandingSplits(series.length, 4);
+  const candidates = makeDiscretionaryCandidates(seed);
+
+  const results = candidates.map((c) => {
+    const preds = [];
+    const actuals = [];
+    splits.forEach((sp) => {
+      const model = c.train(sp.trainIdx.map((i) => X[i]), sp.trainIdx.map((i) => y[i]), sp.trainIdx.map((i) => dow[i]));
+      sp.testIdx.forEach((i) => {
+        preds.push(Math.max(0, c.predict(model, X[i], dow[i])));
+        actuals.push(y[i]);
+      });
+    });
+    return { name: c.name, mae: mlMae(actuals, preds), rmse: mlRmse(actuals, preds) };
+  });
+
+  const baselineMae = results.find((r) => r.name === 'seasonal').mae;
+  let best = results.reduce((a, b) => (b.mae < a.mae ? b : a));
+  if (best.name !== 'seasonal' && best.mae > baselineMae * 0.99) {
+    best = results.find((r) => r.name === 'seasonal');
+  }
+  const cv = { winner: best.name, baselineMae, results };
+
+  if (best.name === 'seasonal') {
+    const baseline = buildSeasonalBaseline(series, { sufficiency: ML_SUFFICIENCY.GOOD });
+    baseline.cv = cv;
+    return baseline;
+  }
+
+  // Retrain the winner on the full window for deployment, and measure its
+  // in-sample residual spread to size the projection's uncertainty band.
+  const winner = candidates.find((c) => c.name === best.name);
+  const params = winner.train(X, y, dow);
+  const residuals = X.map((x, i) => y[i] - winner.predict(params, x, dow[i]));
+  return {
+    type: best.name,
+    params,
+    anchorDate,
+    residualStd: meanStd(residuals).std,
+    sufficiency: ML_SUFFICIENCY.GOOD,
+    trainedDays: series.length,
+    cv,
+  };
+}
+
+// Fit the discretionary model for the current ledger. Below 'good' sufficiency
+// walk-forward CV is unreliable, so the robust seasonal-mean baseline is used
+// rather than overfitting a learned model to a handful of days; at 'good' the
+// CV picks the best of seasonal / ridge / MLP.
 function trainDiscretionaryModel(options) {
   const opts = options || {};
   const baseCurrency = MidoriState.preferences.baseCurrency;
   const endDate = MidoriState.virtualDate;
   const lookback = opts.lookbackDays || ML_FORECAST_LOOKBACK_DAYS;
-
   const series = getDiscretionaryDailySeries(MidoriState.transactions, baseCurrency, endDate, lookback);
-  const overall = meanStd(series.map((d) => d.amount));
-
-  const byDow = Array.from({ length: 7 }, () => []);
-  series.forEach((d) => {
-    byDow[mlDayOfWeek(d.date)].push(d.amount);
-  });
-
   const audit = auditLedgerData(MidoriState);
-  const useSeasonality = audit.sufficiency === ML_SUFFICIENCY.GOOD;
-  // Fall back to the overall estimate for any weekday with too few samples to
-  // be meaningful on its own.
-  const dow = byDow.map((vals) => (vals.length >= 3 ? meanStd(vals) : overall));
 
-  return {
-    overall,
-    dow,
-    useSeasonality,
-    sufficiency: audit.sufficiency,
-    lookbackDays: lookback,
-    trainedDays: series.length,
-  };
+  if (audit.sufficiency !== ML_SUFFICIENCY.GOOD) {
+    return buildSeasonalBaseline(series, audit);
+  }
+  return selectDiscretionaryModel(series, { seed: opts.seed });
 }
 
-// Predicted discretionary spend for one calendar day: {mean, std}.
+// Predicted discretionary spend for one calendar day: {mean, std}. A learned
+// model is evaluated through its date-features; the seasonal baseline reads its
+// weekday (or overall) bucket. Spend can't be negative, so the mean is clamped.
 function predictDiscretionaryForDay(model, dateStr) {
+  if (model.type === 'ridge' || model.type === 'mlp') {
+    const x = mlDateFeatures(dateStr, model.anchorDate);
+    const raw = model.type === 'ridge' ? mlPredictRidge(model.params, x) : mlPredictMLP(model.params, x);
+    return { mean: Math.max(0, raw), std: model.residualStd };
+  }
   if (model.useSeasonality) return model.dow[mlDayOfWeek(dateStr)];
   return model.overall;
 }

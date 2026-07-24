@@ -192,6 +192,23 @@ function renderDashboardForecast() {
 // charts in charts.js use) instead of stacking canvases.
 let balanceProjectionChartInstance = null;
 
+// One-line backtest report for the forecast card: which model the walk-forward
+// CV selected and its average daily error against the seasonal baseline, so the
+// projection shows its work instead of asking to be trusted blindly.
+function describeForecastModel(model) {
+  if (!model) return '';
+  const names = { seasonal: 'Weekday-average baseline', ridge: 'Linear regression', mlp: 'Neural net (MLP)' };
+  const label = names[model.type] || model.type;
+  const base = MidoriState.preferences.baseCurrency;
+  if (model.cv && model.type !== 'seasonal') {
+    const win = model.cv.results.find((r) => r.name === model.type);
+    return `Model: ${label} · avg error ${formatCurrency(Math.round(win.mae), base)}/day vs ` +
+      `${formatCurrency(Math.round(model.cv.baselineMae), base)} baseline (walk-forward CV)`;
+  }
+  if (model.cv) return `Model: ${label} — no learned model beat it on your data yet`;
+  return `Model: ${label} — log a few more weeks to unlock model comparison`;
+}
+
 // Draw the on-device cash-flow projection (js/ml-forecast.js) as a balance line
 // with an uncertainty band. When there is too little history the model returns
 // no points, so the canvas is hidden and a "keep logging" hint shown instead —
@@ -215,11 +232,15 @@ function renderBalanceProjection() {
       balanceProjectionChartInstance.destroy();
       balanceProjectionChartInstance = null;
     }
+    const clearNote = document.getElementById('balanceProjectionModelNote');
+    if (clearNote) clearNote.textContent = '';
     return;
   }
 
   if (emptyMsg) emptyMsg.style.display = 'none';
   canvas.style.display = 'block';
+  const modelNote = document.getElementById('balanceProjectionModelNote');
+  if (modelNote) modelNote.textContent = describeForecastModel(projection.model);
 
   const colors = getThemeColors();
   const labels = projection.points.map((p) =>
