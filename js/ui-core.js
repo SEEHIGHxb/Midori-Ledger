@@ -215,7 +215,8 @@ function renderAllViews() {
   renderTags();
   renderLedger();
   renderSchedules();
-  
+  renderInsights();
+
   // Update form selector details
   syncTransactionCategoryOptions();
   syncScheduleCategoryOptions();
@@ -328,6 +329,7 @@ const DATA_ACTION_HANDLERS = {
   toggleScheduleActive: (arg) => toggleScheduleActive(arg),
   openEditScheduleModal: (arg) => openEditScheduleModal(arg),
   triggerScheduleDelete: (arg) => triggerScheduleDelete(arg),
+  addDetectedSubscription: (arg) => addDetectedSubscription(arg),
 };
 
 function setupDelegatedActions() {
